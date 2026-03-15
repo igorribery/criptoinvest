@@ -2,7 +2,13 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
-import { AuthUser, clearAuthSession, getAuthSession, saveAuthSession } from "@/lib/auth";
+import {
+  AuthUser,
+  clearAuthSession,
+  consumeAuthError,
+  getAuthSession,
+  saveAuthSession,
+} from "@/lib/auth";
 
 type Mode = "login" | "register";
 
@@ -29,6 +35,18 @@ export function AuthControls() {
     sync();
     window.addEventListener("auth:changed", sync);
     return () => window.removeEventListener("auth:changed", sync);
+  }, []);
+
+  useEffect(() => {
+    const pendingError = consumeAuthError();
+
+    if (!pendingError) {
+      return;
+    }
+
+    setMode("login");
+    setError(pendingError);
+    setIsOpen(true);
   }, []);
 
   const title = useMemo(() => (mode === "login" ? "Entrar" : "Criar conta"), [mode]);
@@ -76,7 +94,7 @@ export function AuthControls() {
     <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
       {user ? (
         <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm">
-          <span className="max-w-32 truncate text-slate-200">Olá, {user.name}</span>
+          <span className="max-w-32 truncate text-slate-200">Ola, {user.name}</span>
           <button
             className="rounded-md border border-slate-600 px-2 py-1 text-slate-300 hover:bg-slate-800"
             onClick={logout}
@@ -90,6 +108,7 @@ export function AuthControls() {
           <button
             className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-100 hover:bg-slate-800"
             onClick={() => {
+              setError(null);
               setMode("register");
               setIsOpen(true);
             }}
@@ -100,6 +119,7 @@ export function AuthControls() {
           <button
             className="rounded-md bg-cyan-500 px-3 py-1.5 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
             onClick={() => {
+              setError(null);
               setMode("login");
               setIsOpen(true);
             }}
@@ -120,7 +140,7 @@ export function AuthControls() {
                 onClick={() => setIsOpen(false)}
                 type="button"
               >
-                ✕
+                x
               </button>
             </div>
 
@@ -157,12 +177,30 @@ export function AuthControls() {
               {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
               <button
-                className="w-full rounded-md bg-cyan-500 py-2 font-semibold text-slate-950 hover:bg-cyan-400 disabled:opacity-60"
+                className="w-full rounded-md bg-cyan-500 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-wait disabled:opacity-70"
                 disabled={isSubmitting}
                 type="submit"
               >
-                {isSubmitting ? "Enviando..." : title}
+                {isSubmitting ? (
+                  <span className="flex items-center justify-center gap-3">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
+                    <span>Validando acesso...</span>
+                  </span>
+                ) : (
+                  title
+                )}
               </button>
+
+              {isSubmitting ? (
+                <div className="space-y-2 rounded-md border border-cyan-500/20 bg-cyan-500/10 px-3 py-2">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+                    <div className="h-full w-1/3 animate-pulse rounded-full bg-cyan-400" />
+                  </div>
+                  <p className="text-center text-xs text-cyan-100">
+                    Estamos verificando suas credenciais com seguranca.
+                  </p>
+                </div>
+              ) : null}
             </form>
 
             <div className="my-4 h-px bg-slate-700" />
@@ -173,14 +211,17 @@ export function AuthControls() {
               onClick={handleGoogleLogin}
               type="button"
             >
-              Continuar com Google
+              Entrar com o Google
             </button>
 
             <p className="mt-3 text-center text-sm text-slate-400">
-              {mode === "login" ? "Não tem conta?" : "Já tem conta?"}{" "}
+              {mode === "login" ? "Nao tem conta?" : "Ja tem conta?"}{" "}
               <button
                 className="text-cyan-300 hover:text-cyan-200"
-                onClick={() => setMode(mode === "login" ? "register" : "login")}
+                onClick={() => {
+                  setError(null);
+                  setMode(mode === "login" ? "register" : "login");
+                }}
                 type="button"
               >
                 {mode === "login" ? "Cadastre-se" : "Entrar"}
@@ -198,7 +239,7 @@ export function AuthGoogleCallbackInfo() {
     <div className="flex min-h-screen items-center justify-center p-6 text-center text-slate-200">
       <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-6">
         <h1 className="text-2xl font-semibold">Conectando sua conta Google...</h1>
-        <p className="mt-2 text-slate-300">Se demorar muito, volte para a tela inicial e tente novamente.</p>
+        <p className="mt-2 text-slate-300">Se demorar muito, voce voltara para a tela inicial.</p>
       </div>
     </div>
   );
