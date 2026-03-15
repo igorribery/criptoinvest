@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { env } from "../config/env.js";
+import { SignToken, TokenPayload, VerifyPassword } from "../types/cripto-types.js";
 
 const TOKEN_HEADER = { alg: "HS256", typ: "JWT" };
 
@@ -17,25 +18,20 @@ export function hashPassword(password: string): string {
   return `${salt}:${hash}`;
 }
 
-export function verifyPassword(password: string, storedHash: string): boolean {
-  const [salt, originalHash] = storedHash.split(":");
+export function verifyPassword(input: VerifyPassword): boolean {
+  const [salt, originalHash] = input.storedHash.split(":");
   if (!salt || !originalHash) return false;
 
-  const hash = scryptSync(password, salt, 64).toString("hex");
+  const hash = scryptSync(input.password, salt, 64).toString("hex");
   return timingSafeEqual(Buffer.from(hash, "hex"), Buffer.from(originalHash, "hex"));
 }
 
-type TokenPayload = {
-  sub: string;
-  email: string;
-  exp: number;
-};
 
-export function signToken(userId: string, email: string) {
+export function signToken(input: SignToken) {
   const nowInSeconds = Math.floor(Date.now() / 1000);
   const payload: TokenPayload = {
-    sub: userId,
-    email,
+    sub: input.userId,
+    email: input.email,
     exp: nowInSeconds + env.tokenExpiresInHours * 3600,
   };
 

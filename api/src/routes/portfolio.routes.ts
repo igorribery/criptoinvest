@@ -2,8 +2,8 @@ import { Router } from "express";
 import { pool } from "../db/pool.js";
 import { requireAuth } from "../middleware/auth.js";
 import { isNonNegativeNumber, isPositiveNumber } from "../utils/validators.js";
+import { CreatePortfolioEntryType, ALLOWED_ASSET_TYPES } from "../types/portfolio-types.js";
 
-const ALLOWED_ASSET_TYPES = ["CRYPTO", "STOCK", "ETF"] as const;
 
 export const portfolioRouter = Router();
 
@@ -19,16 +19,7 @@ portfolioRouter.post("/entries", async (req, res) => {
     unitPriceBrl,
     otherCostsBrl,
     totalValueBrl,
-  } = req.body as {
-    assetType?: string;
-    symbol?: string;
-    assetName?: string;
-    purchaseDate?: string;
-    quantity?: number;
-    unitPriceBrl?: number;
-    otherCostsBrl?: number;
-    totalValueBrl?: number;
-  };
+  } = req.body as CreatePortfolioEntryType
 
   if (!assetType || !symbol || !assetName || !purchaseDate) {
     return res.status(400).json({ message: "assetType, symbol, assetName e purchaseDate são obrigatórios." });
