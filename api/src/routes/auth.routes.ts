@@ -2,6 +2,7 @@ import { randomBytes, randomInt } from "node:crypto";
 import { Router } from "express";
 import { env, isGoogleAuthEnabled } from "../config/env.js";
 import { pool } from "../db/pool.js";
+import { requireAuth } from "../middleware/auth.js";
 import { sendRegisterCodeEmail } from "../services/email.service.js";
 import { hashPassword, signToken, verifyPassword } from "../utils/crypto.js";
 import { isValidEmail } from "../utils/validators.js";
@@ -26,6 +27,15 @@ type PendingUser = {
   created_at: string;
 };
 
+type PendingEmailChange = {
+  id: string;
+  user_id: string;
+  new_email: string;
+  verification_code_hash: string;
+  attempt_count: number;
+  expires_at: string;
+};
+
 function sanitizeUser(user: DbUser, extras?: { avatarUrl?: string }) {
   return {
     id: user.id,
@@ -46,6 +56,10 @@ async function findExistingUserByEmail(email: string) {
   return pool.query("SELECT id, name, email, password_hash, google_id, created_at FROM users WHERE email = $1", [
     email,
   ]);
+}
+
+async function findUserById(userId: string) {
+  return pool.query("SELECT id, name, email, password_hash, google_id, created_at FROM users WHERE id = $1", [userId]);
 }
 
 authRouter.post("/register/start", async (req, res) => {
@@ -215,6 +229,240 @@ authRouter.post("/register/resend", async (req, res) => {
     message: "Novo codigo enviado para o seu email.",
     email: normalizedEmail,
     expiresInMinutes: env.registerCodeExpiresMinutes,
+  });
+});
+
+authRouter.patch("/profile", requireAuth, async (req, res) => {
+  const { name } = req.body as { name?: string };
+
+  if (!name?.trim()) {
+    return res.status(400).json({ message: "Nome e obrigatorio." });
+  }
+
+  const updated = await pool.query(
+    `UPDATE users
+     SET name = $2
+     WHERE id = $1
+     RETURNING id, name, email, password_hash, google_id, created_at`,
+    [req.authUser!.id, name.trim()],
+  );
+
+  if (!updated.rowCount) {
+    return res.status(404).json({ message: "Usuario nao encontrado." });
+  }
+
+  const user = updated.rows[0] as DbUser;
+  return res.json({ user: sanitizeUser(user) });
+});
+
+authRouter.post("/password/change", requireAuth, async (req, res) => {
+  const { currentPassword, newPassword } = req.body as {
+    currentPassword?: string;
+    newPassword?: string;
+  };
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ message: "Senha atual e nova senha sao obrigatorias." });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ message: "Nova senha deve ter ao menos 6 caracteres." });
+  }
+
+  const result = await findUserById(req.authUser!.id);
+  if (!result.rowCount) {
+    return res.status(404).json({ message: "Usuario nao encontrado." });
+  }
+
+  const user = result.rows[0] as DbUser;
+
+  if (!user.password_hash) {
+    return res.status(403).json({
+      message: "Sua conta nao possui senha local. Entre pelo Google para continuar.",
+    });
+  }
+
+  if (!verifyPassword(currentPassword, user.password_hash)) {
+    return res.status(401).json({ message: "Senha atual invalida." });
+  }
+
+  await pool.query("UPDATE users SET password_hash = $2 WHERE id = $1", [
+    req.authUser!.id,
+    hashPassword(newPassword),
+  ]);
+
+  return res.json({ message: "Senha atualizada com sucesso." });
+});
+
+authRouter.post("/email-change/start", requireAuth, async (req, res) => {
+  const { newEmail } = req.body as { newEmail?: string };
+
+  if (!newEmail) {
+    return res.status(400).json({ message: "Novo email e obrigatorio." });
+  }
+
+  const normalizedEmail = newEmail.trim().toLowerCase();
+
+  if (!isValidEmail(normalizedEmail)) {
+    return res.status(400).json({ message: "Email invalido." });
+  }
+
+  if (normalizedEmail === req.authUser!.email.toLowerCase()) {
+    return res.status(400).json({ message: "Informe um email diferente do atual." });
+  }
+
+  const existingUser = await findExistingUserByEmail(normalizedEmail);
+  if (existingUser.rowCount) {
+    return res.status(409).json({ message: "Este email ja esta em uso." });
+  }
+
+  const existingPendingChange = await pool.query(
+    "SELECT id, user_id FROM pending_email_changes WHERE new_email = $1",
+    [normalizedEmail],
+  );
+
+  if (existingPendingChange.rowCount) {
+    const pendingChangeOwner = existingPendingChange.rows[0] as { id: string; user_id: string };
+    if (pendingChangeOwner.user_id !== req.authUser!.id) {
+      return res.status(409).json({ message: "Este email ja esta reservado em outra confirmacao." });
+    }
+  }
+
+  const userResult = await findUserById(req.authUser!.id);
+  if (!userResult.rowCount) {
+    return res.status(404).json({ message: "Usuario nao encontrado." });
+  }
+
+  const currentUser = userResult.rows[0] as DbUser;
+  const code = generateVerificationCode();
+  const codeHash = hashPassword(code);
+  const expiresAt = new Date(Date.now() + env.registerCodeExpiresMinutes * 60 * 1000).toISOString();
+
+  await pool.query(
+    `INSERT INTO pending_email_changes (user_id, new_email, verification_code_hash, expires_at, updated_at)
+     VALUES ($1, $2, $3, $4, NOW())
+     ON CONFLICT (user_id) DO UPDATE
+     SET new_email = EXCLUDED.new_email,
+         verification_code_hash = EXCLUDED.verification_code_hash,
+         expires_at = EXCLUDED.expires_at,
+         attempt_count = 0,
+         updated_at = NOW()`,
+    [req.authUser!.id, normalizedEmail, codeHash, expiresAt],
+  );
+
+  await sendRegisterCodeEmail(normalizedEmail, currentUser.name, code);
+
+  return res.status(202).json({
+    message: "Codigo enviado para confirmar o novo email.",
+    email: normalizedEmail,
+    expiresInMinutes: env.registerCodeExpiresMinutes,
+  });
+});
+
+authRouter.post("/email-change/resend", requireAuth, async (req, res) => {
+  const pendingResult = await pool.query(
+    `SELECT id, user_id, new_email, verification_code_hash, attempt_count, expires_at
+     FROM pending_email_changes
+     WHERE user_id = $1`,
+    [req.authUser!.id],
+  );
+
+  if (!pendingResult.rowCount) {
+    return res.status(404).json({ message: "Nenhuma troca de email pendente encontrada." });
+  }
+
+  const pendingChange = pendingResult.rows[0] as PendingEmailChange;
+  const userResult = await findUserById(req.authUser!.id);
+  if (!userResult.rowCount) {
+    return res.status(404).json({ message: "Usuario nao encontrado." });
+  }
+
+  const currentUser = userResult.rows[0] as DbUser;
+  const code = generateVerificationCode();
+  const codeHash = hashPassword(code);
+  const expiresAt = new Date(Date.now() + env.registerCodeExpiresMinutes * 60 * 1000).toISOString();
+
+  await pool.query(
+    `UPDATE pending_email_changes
+     SET verification_code_hash = $2,
+         expires_at = $3,
+         attempt_count = 0,
+         updated_at = NOW()
+     WHERE id = $1`,
+    [pendingChange.id, codeHash, expiresAt],
+  );
+
+  await sendRegisterCodeEmail(pendingChange.new_email, currentUser.name, code);
+
+  return res.status(202).json({
+    message: "Novo codigo enviado para o email informado.",
+    email: pendingChange.new_email,
+    expiresInMinutes: env.registerCodeExpiresMinutes,
+  });
+});
+
+authRouter.post("/email-change/confirm", requireAuth, async (req, res) => {
+  const { code } = req.body as { code?: string };
+
+  if (!code) {
+    return res.status(400).json({ message: "Codigo e obrigatorio." });
+  }
+
+  const pendingResult = await pool.query(
+    `SELECT id, user_id, new_email, verification_code_hash, attempt_count, expires_at
+     FROM pending_email_changes
+     WHERE user_id = $1`,
+    [req.authUser!.id],
+  );
+
+  if (!pendingResult.rowCount) {
+    return res.status(404).json({ message: "Nenhuma troca de email pendente encontrada." });
+  }
+
+  const pendingChange = pendingResult.rows[0] as PendingEmailChange;
+  if (new Date(pendingChange.expires_at).getTime() < Date.now()) {
+    await pool.query("DELETE FROM pending_email_changes WHERE id = $1", [pendingChange.id]);
+    return res.status(410).json({ message: "Codigo expirado. Solicite um novo envio." });
+  }
+
+  if (pendingChange.attempt_count >= env.registerCodeMaxAttempts) {
+    await pool.query("DELETE FROM pending_email_changes WHERE id = $1", [pendingChange.id]);
+    return res.status(429).json({ message: "Limite de tentativas excedido. Solicite um novo codigo." });
+  }
+
+  const existingUser = await findExistingUserByEmail(pendingChange.new_email);
+  if (existingUser.rowCount) {
+    const user = existingUser.rows[0] as DbUser;
+    if (user.id !== req.authUser!.id) {
+      return res.status(409).json({ message: "Este email ja esta em uso." });
+    }
+  }
+
+  if (!verifyPassword(code.trim(), pendingChange.verification_code_hash)) {
+    await pool.query(
+      "UPDATE pending_email_changes SET attempt_count = attempt_count + 1, updated_at = NOW() WHERE id = $1",
+      [pendingChange.id],
+    );
+    return res.status(400).json({ message: "Codigo invalido." });
+  }
+
+  const updated = await pool.query(
+    `UPDATE users
+     SET email = $2
+     WHERE id = $1
+     RETURNING id, name, email, password_hash, google_id, created_at`,
+    [req.authUser!.id, pendingChange.new_email],
+  );
+
+  await pool.query("DELETE FROM pending_email_changes WHERE id = $1", [pendingChange.id]);
+
+  const user = updated.rows[0] as DbUser;
+  const token = signToken(user.id, user.email);
+
+  return res.json({
+    message: "Email atualizado com sucesso.",
+    token,
+    user: sanitizeUser(user),
   });
 });
 

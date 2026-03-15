@@ -35,6 +35,12 @@ export const api = {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     }),
+  patch: <T>(path: string, body: unknown, headers?: HeadersInit) =>
+    request<T>(path, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    }),
 };
 
 export { API_URL };

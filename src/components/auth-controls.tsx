@@ -23,6 +23,7 @@ import {
   ListIcon,
   LogoutIcon,
   PlusIcon,
+  SettingsIcon,
   XIcon,
 } from "@/components/ui/icons";
 import { Input } from "@/components/ui/input";
@@ -444,6 +445,15 @@ export function AuthControls() {
                 >
                   <span>Lançamentos</span>
                   <ListIcon className="text-cyan-400" />
+                </Link>
+
+                <Link
+                  className="flex items-center justify-between rounded-2xl px-4 py-3 text-slate-100 transition hover:bg-slate-900"
+                  href="/configuracoes"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <span>Configuracoes</span>
+                  <SettingsIcon className="text-cyan-400" />
                 </Link>
 
                 <button

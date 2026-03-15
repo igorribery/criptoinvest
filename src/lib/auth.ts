@@ -6,7 +6,7 @@ export type AuthUser = {
   avatarUrl?: string;
 };
 
-type AuthSession = {
+export type AuthSession = {
   token: string;
   user: AuthUser;
 };
@@ -39,6 +39,16 @@ export function getAuthSession(): AuthSession | null {
 export function clearAuthSession() {
   localStorage.removeItem(AUTH_STORAGE_KEY);
   window.dispatchEvent(new Event("auth:changed"));
+}
+
+export function updateAuthUser(user: AuthUser, token?: string) {
+  const current = getAuthSession();
+  if (!current && !token) return;
+
+  saveAuthSession({
+    token: token ?? current!.token,
+    user,
+  });
 }
 
 export function saveAuthError(message: string, email?: string) {

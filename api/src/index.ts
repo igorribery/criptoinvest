@@ -39,9 +39,12 @@ app.use("/portfolio", portfolioRouter);
 app.use("/alerts", alertsRouter);
 
 app.get("/me", requireAuth, async (req, res) => {
-  const result = await pool.query("SELECT id, name, email, created_at FROM users WHERE id = $1", [
-    req.authUser!.id,
-  ]);
+  const result = await pool.query(
+    `SELECT id, name, email, created_at AS "createdAt"
+     FROM users
+     WHERE id = $1`,
+    [req.authUser!.id],
+  );
 
   if (!result.rowCount) {
     return res.status(404).json({ message: "Usuário não encontrado." });
