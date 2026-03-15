@@ -101,7 +101,11 @@ export default async function Home() {
                       <Sparkline
                         data={coin.sparkline7d}
                         id={coin.id}
-                        positive={(coin.priceChangePercentage7d ?? 0) >= 0}
+                        positive={
+                          coin.sparkline7d.length >= 2
+                            ? coin.sparkline7d[coin.sparkline7d.length - 1] >= coin.sparkline7d[0]
+                            : (coin.priceChangePercentage7d ?? 0) >= 0
+                        }
                       />
                     </td>
                   </tr>
