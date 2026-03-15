@@ -31,11 +31,18 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 type Mode = "login" | "register";
+type RegisterStep = "form" | "verify";
 type TransactionType = "buy" | "sell";
 
 type AuthResponse = {
   token: string;
   user: AuthUser;
+};
+
+type RegisterStartResponse = {
+  message: string;
+  email: string;
+  expiresInMinutes: number;
 };
 
 type CryptoOption = {
@@ -91,6 +98,7 @@ function Field({ children }: { children: React.ReactNode }) {
 export function AuthControls() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [mode, setMode] = useState<Mode>("login");
+  const [registerStep, setRegisterStep] = useState<RegisterStep>("form");
   const [isOpen, setIsOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAddCryptoOpen, setIsAddCryptoOpen] = useState(false);
@@ -99,6 +107,9 @@ export function AuthControls() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [verificationCode, setVerificationCode] = useState("");
+  const [verificationEmail, setVerificationEmail] = useState("");
+  const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -125,10 +136,14 @@ export function AuthControls() {
       if (!pendingError) return;
 
       setMode("login");
+      setRegisterStep("form");
       setError(pendingError.message);
       setEmail(pendingError.email ?? "");
       setPassword("");
       setConfirmPassword("");
+      setVerificationCode("");
+      setVerificationEmail("");
+      setVerificationMessage(null);
       setIsPasswordVisible(false);
       setIsOpen(true);
     };
@@ -173,7 +188,11 @@ export function AuthControls() {
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [isAssetAutocompleteOpen]);
 
-  const title = useMemo(() => (mode === "login" ? "Entrar" : "Criar conta"), [mode]);
+  const title = useMemo(() => {
+    if (mode === "login") return "Entrar";
+    if (registerStep === "verify") return "Confirmar cadastro";
+    return "Criar conta";
+  }, [mode, registerStep]);
 
   const filteredCryptoOptions = useMemo(() => {
     const query = addCryptoForm.assetQuery.trim().toLowerCase();
@@ -208,7 +227,7 @@ export function AuthControls() {
     event.preventDefault();
     setError(null);
 
-    if (mode === "register" && password !== confirmPassword) {
+    if (mode === "register" && registerStep === "form" && password !== confirmPassword) {
       setError("As senhas precisam ser iguais.");
       return;
     }
@@ -216,18 +235,67 @@ export function AuthControls() {
     setIsSubmitting(true);
 
     try {
-      const payload =
-        mode === "login"
-          ? await api.post<AuthResponse>("/auth/login", { email, password })
-          : await api.post<AuthResponse>("/auth/register", { name, email, password });
+      if (mode === "login") {
+        const payload = await api.post<AuthResponse>("/auth/login", { email, password });
+        saveAuthSession(payload);
+        setIsOpen(false);
+        setPassword("");
+        setConfirmPassword("");
+        setVerificationCode("");
+        setVerificationEmail("");
+        setVerificationMessage(null);
+        setIsPasswordVisible(false);
+        return;
+      }
+
+      if (registerStep === "form") {
+        const payload = await api.post<RegisterStartResponse>("/auth/register/start", {
+          name,
+          email,
+          password,
+        });
+
+        setRegisterStep("verify");
+        setVerificationEmail(payload.email);
+        setVerificationMessage(payload.message);
+        setVerificationCode("");
+        setPassword("");
+        setConfirmPassword("");
+        return;
+      }
+
+      const payload = await api.post<AuthResponse>("/auth/register/confirm", {
+        email: verificationEmail || email,
+        code: verificationCode,
+      });
 
       saveAuthSession(payload);
       setIsOpen(false);
       setPassword("");
       setConfirmPassword("");
+      setVerificationCode("");
+      setVerificationEmail("");
+      setVerificationMessage(null);
       setIsPasswordVisible(false);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Falha no login.");
+      setError(requestError instanceof Error ? requestError.message : "Falha na autenticacao.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleResendCode() {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      const payload = await api.post<RegisterStartResponse>("/auth/register/resend", {
+        email: verificationEmail || email,
+      });
+      setVerificationEmail(payload.email);
+      setVerificationMessage(payload.message);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Falha ao reenviar o codigo.");
     } finally {
       setIsSubmitting(false);
     }
@@ -249,11 +317,23 @@ export function AuthControls() {
   function closeAuthModal() {
     setIsOpen(false);
     setError(null);
+    setRegisterStep("form");
     setEmail("");
     setPassword("");
     setConfirmPassword("");
+    setVerificationCode("");
+    setVerificationEmail("");
+    setVerificationMessage(null);
     setName("");
     setIsPasswordVisible(false);
+  }
+
+  function backToRegisterForm() {
+    setError(null);
+    setRegisterStep("form");
+    setVerificationCode("");
+    setVerificationEmail("");
+    setVerificationMessage(null);
   }
 
   function logout() {
@@ -292,8 +372,9 @@ export function AuthControls() {
   const totalValueLabel =
     transactionType === "buy" ? "Valor total da compra" : "Valor total da venda";
   const isRegisterMode = mode === "register";
+  const isVerifyStep = isRegisterMode && registerStep === "verify";
   const hasStartedConfirmingPassword =
-    isRegisterMode && password.length > 0 && confirmPassword.length > 0;
+    isRegisterMode && registerStep === "form" && password.length > 0 && confirmPassword.length > 0;
   const passwordsMatch = password.length > 0 && password === confirmPassword;
   const passwordsDoNotMatch =
     hasStartedConfirmingPassword && password !== confirmPassword;
@@ -387,7 +468,11 @@ export function AuthControls() {
               setEmail("");
               setPassword("");
               setConfirmPassword("");
+              setVerificationCode("");
+              setVerificationEmail("");
+              setVerificationMessage(null);
               setName("");
+              setRegisterStep("form");
               setIsPasswordVisible(false);
               setMode("register");
               setIsOpen(true);
@@ -402,7 +487,11 @@ export function AuthControls() {
               setEmail("");
               setPassword("");
               setConfirmPassword("");
+              setVerificationCode("");
+              setVerificationEmail("");
+              setVerificationMessage(null);
               setName("");
+              setRegisterStep("form");
               setIsPasswordVisible(false);
               setMode("login");
               setIsOpen(true);
@@ -416,14 +505,21 @@ export function AuthControls() {
       <Dialog open={isOpen}>
         <DialogContent className="max-w-md rounded-xl p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-xl font-semibold text-slate-100">{title}</h3>
+            <div className="flex items-center gap-2">
+              {isVerifyStep ? (
+                <Button onClick={backToRegisterForm} size="icon" variant="ghost">
+                  <ArrowLeftIcon />
+                </Button>
+              ) : null}
+              <h3 className="text-xl font-semibold text-slate-100">{title}</h3>
+            </div>
             <Button onClick={closeAuthModal} size="icon" variant="ghost">
               <XIcon />
             </Button>
           </div>
 
           <form className="space-y-3" onSubmit={handleSubmit}>
-            {mode === "register" ? (
+            {mode === "register" && registerStep === "form" ? (
               <Input onChange={(event) => setName(event.target.value)} placeholder="Nome" required value={name} />
             ) : null}
 
@@ -431,35 +527,33 @@ export function AuthControls() {
               onChange={(event) => setEmail(event.target.value)}
               placeholder="Email"
               required
+              readOnly={isVerifyStep}
               type="email"
-              value={email}
+              value={isVerifyStep ? verificationEmail || email : email}
             />
 
-            <div className="relative">
-              <Input
-                className={cn(
-                  "pr-12",
-                  passwordsMatch ? "border-emerald-500 focus:border-emerald-400" : "",
-                  passwordsDoNotMatch ? "border-rose-500 focus:border-rose-400" : "",
-                )}
-                minLength={6}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Senha"
-                required
-                type={isPasswordVisible ? "text" : "password"}
-                value={password}
-              />
-              <button
-                aria-label={isPasswordVisible ? "Ocultar senha" : "Mostrar senha"}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-cyan-300"
-                onClick={() => setIsPasswordVisible((current) => !current)}
-                type="button"
-              >
-                {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
-              </button>
-            </div>
+            {isVerifyStep ? (
+              <>
+                {verificationMessage ? (
+                  <p className="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
+                    {verificationMessage}
+                  </p>
+                ) : null}
 
-            {mode === "register" ? (
+                <Input
+                  inputMode="numeric"
+                  maxLength={6}
+                  onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
+                  placeholder="Codigo de 6 digitos"
+                  required
+                  value={verificationCode}
+                />
+
+                <p className="text-sm text-slate-400">
+                  Digite o codigo que enviamos para o seu email para concluir o cadastro.
+                </p>
+              </>
+            ) : (
               <>
                 <div className="relative">
                   <Input
@@ -469,11 +563,11 @@ export function AuthControls() {
                       passwordsDoNotMatch ? "border-rose-500 focus:border-rose-400" : "",
                     )}
                     minLength={6}
-                    onChange={(event) => setConfirmPassword(event.target.value)}
-                    placeholder="Confirmar senha"
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Senha"
                     required
                     type={isPasswordVisible ? "text" : "password"}
-                    value={confirmPassword}
+                    value={password}
                   />
                   <button
                     aria-label={isPasswordVisible ? "Ocultar senha" : "Mostrar senha"}
@@ -485,33 +579,65 @@ export function AuthControls() {
                   </button>
                 </div>
 
-                {hasStartedConfirmingPassword ? (
-                  <p
-                    className={cn(
-                      "text-sm",
-                      passwordsMatch ? "text-emerald-300" : "text-rose-300",
-                    )}
-                  >
-                    {passwordsMatch ? "As senhas estao iguais." : "As senhas precisam ser iguais."}
-                  </p>
+                {mode === "register" ? (
+                  <>
+                    <div className="relative">
+                      <Input
+                        className={cn(
+                          "pr-12",
+                          passwordsMatch ? "border-emerald-500 focus:border-emerald-400" : "",
+                          passwordsDoNotMatch ? "border-rose-500 focus:border-rose-400" : "",
+                        )}
+                        minLength={6}
+                        onChange={(event) => setConfirmPassword(event.target.value)}
+                        placeholder="Confirmar senha"
+                        required
+                        type={isPasswordVisible ? "text" : "password"}
+                        value={confirmPassword}
+                      />
+                      <button
+                        aria-label={isPasswordVisible ? "Ocultar senha" : "Mostrar senha"}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-cyan-300"
+                        onClick={() => setIsPasswordVisible((current) => !current)}
+                        type="button"
+                      >
+                        {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                      </button>
+                    </div>
+
+                    {hasStartedConfirmingPassword ? (
+                      <p
+                        className={cn(
+                          "text-sm",
+                          passwordsMatch ? "text-emerald-300" : "text-rose-300",
+                        )}
+                      >
+                        {passwordsMatch ? "As senhas estao iguais." : "As senhas precisam ser iguais."}
+                      </p>
+                    ) : null}
+                  </>
                 ) : null}
               </>
-            ) : null}
+            )}
 
             {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
             <Button
               className="w-full rounded-md"
-              disabled={isSubmitting || (mode === "register" && !passwordsMatch)}
+              disabled={isSubmitting || (mode === "register" && registerStep === "form" && !passwordsMatch)}
               type="submit"
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-3">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
-                  <span>Validando acesso...</span>
+                  <span>{isVerifyStep ? "Confirmando codigo..." : "Validando acesso..."}</span>
                 </span>
               ) : (
-                title
+                mode === "login"
+                  ? "Entrar"
+                  : isVerifyStep
+                    ? "Confirmar codigo"
+                    : "Criar conta"
               )}
             </Button>
 
@@ -525,38 +651,52 @@ export function AuthControls() {
                 </p>
               </div>
             ) : null}
+
+            {isVerifyStep ? (
+              <Button className="w-full rounded-md" disabled={isSubmitting} onClick={handleResendCode} type="button" variant="outline">
+                Reenviar codigo
+              </Button>
+            ) : null}
           </form>
 
-          <Separator className="my-4" />
+          {!isVerifyStep ? <Separator className="my-4" /> : null}
 
-          <Button
-            className="w-full rounded-md"
-            disabled={isSubmitting}
-            onClick={handleGoogleLogin}
-            type="button"
-            variant="outline"
-          >
-            Entrar com o Google
-          </Button>
-
-          <p className="mt-3 text-center text-sm text-slate-400">
-            {mode === "login" ? "Nao tem conta?" : "Ja tem conta?"}{" "}
-            <button
-              className="text-cyan-300 hover:text-cyan-200"
-              onClick={() => {
-                setError(null);
-                setEmail("");
-                setPassword("");
-                setConfirmPassword("");
-                setName("");
-                setIsPasswordVisible(false);
-                setMode(mode === "login" ? "register" : "login");
-              }}
+          {!isVerifyStep ? (
+            <Button
+              className="w-full rounded-md"
+              disabled={isSubmitting}
+              onClick={handleGoogleLogin}
               type="button"
+              variant="outline"
             >
-              {mode === "login" ? "Cadastre-se" : "Entrar"}
-            </button>
-          </p>
+              Entrar com o Google
+            </Button>
+          ) : null}
+
+          {!isVerifyStep ? (
+            <p className="mt-3 text-center text-sm text-slate-400">
+              {mode === "login" ? "Nao tem conta?" : "Ja tem conta?"}{" "}
+              <button
+                className="text-cyan-300 hover:text-cyan-200"
+                onClick={() => {
+                  setError(null);
+                  setEmail("");
+                  setPassword("");
+                  setConfirmPassword("");
+                  setVerificationCode("");
+                  setVerificationEmail("");
+                  setVerificationMessage(null);
+                  setName("");
+                  setRegisterStep("form");
+                  setIsPasswordVisible(false);
+                  setMode(mode === "login" ? "register" : "login");
+                }}
+                type="button"
+              >
+                {mode === "login" ? "Cadastre-se" : "Entrar"}
+              </button>
+            </p>
+          ) : null}
         </DialogContent>
       </Dialog>
 
