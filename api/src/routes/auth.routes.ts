@@ -3,7 +3,7 @@ import { Router } from "express";
 import { env, isGoogleAuthEnabled } from "../config/env.js";
 import { pool } from "../db/pool.js";
 import { requireAuth } from "../middleware/auth.js";
-import { sendRegisterCodeEmail } from "../services/email.service.js";
+import { sendPasswordResetEmail, sendRegisterCodeEmail } from "../services/email.service.js";
 import { hashPassword, signToken, verifyPassword } from "../utils/crypto.js";
 import { isValidEmail } from "../utils/validators.js";
 
@@ -36,6 +36,13 @@ type PendingEmailChange = {
   expires_at: string;
 };
 
+type PendingPasswordReset = {
+  id: string;
+  user_id: string;
+  token_hash: string;
+  expires_at: string;
+};
+
 function sanitizeUser(user: DbUser, extras?: { avatarUrl?: string }) {
   return {
     id: user.id,
@@ -50,6 +57,10 @@ export const authRouter = Router();
 
 function generateVerificationCode() {
   return randomInt(100000, 1000000).toString();
+}
+
+function generateResetToken() {
+  return randomBytes(32).toString("hex");
 }
 
 async function findExistingUserByEmail(email: string) {
@@ -292,6 +303,105 @@ authRouter.post("/password/change", requireAuth, async (req, res) => {
   ]);
 
   return res.json({ message: "Senha atualizada com sucesso." });
+});
+
+authRouter.post("/password/forgot", async (req, res) => {
+  const { email } = req.body as { email?: string };
+
+  if (!email) {
+    return res.status(400).json({ message: "E-mail obrigatorio." });
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!isValidEmail(normalizedEmail)) {
+    return res.status(400).json({ message: "E-mail invalido." });
+  }
+
+  const result = await findExistingUserByEmail(normalizedEmail);
+
+  if (!result.rowCount) {
+    return res.status(404).json({
+      message: "Nenhuma conta foi encontrada com este e-mail. O link de recuperação nao foi enviado.",
+    });
+  }
+
+  const user = result.rows[0] as DbUser;
+
+  if (!user.password_hash) {
+    return res.status(400).json({
+      message: "Esta conta não usa senha local. Entre com o Google para continuar.",
+    });
+  }
+
+  const resetToken = generateResetToken();
+  const tokenHash = hashPassword(resetToken);
+  const expiresAt = new Date(Date.now() + env.passwordResetExpiresMinutes * 60 * 1000).toISOString();
+  const resetLink = `${env.frontendUrl.replace(/\/$/, "")}/auth/redefinir-senha?token=${encodeURIComponent(resetToken)}`;
+
+  await pool.query(
+    `INSERT INTO pending_password_resets (user_id, token_hash, expires_at, updated_at)
+     VALUES ($1, $2, $3, NOW())
+     ON CONFLICT (user_id) DO UPDATE
+     SET token_hash = EXCLUDED.token_hash,
+         expires_at = EXCLUDED.expires_at,
+         updated_at = NOW()`,
+    [user.id, tokenHash, expiresAt],
+  );
+
+  await sendPasswordResetEmail(normalizedEmail, user.name, resetLink);
+
+  return res.json({
+    message: "Enviamos as instruções de recuperação para o seu e-mail.",
+  });
+});
+
+authRouter.post("/password/reset", async (req, res) => {
+  const { token, newPassword } = req.body as { token?: string; newPassword?: string };
+
+  if (!token || !newPassword) {
+    return res.status(400).json({ message: "Token e nova senha são obrigatórios." });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ message: "Nova senha deve ter ao menos 6 caracteres." });
+  }
+
+  const pendingResult = await pool.query(
+    `SELECT id, user_id, token_hash, expires_at
+     FROM pending_password_resets`,
+  );
+
+  if (!pendingResult.rowCount) {
+    return res.status(400).json({ message: "Link inválido ou expirado." });
+  }
+
+  const pendingResets = pendingResult.rows as PendingPasswordReset[];
+  const pendingReset = pendingResets.find((reset) => verifyPassword(token, reset.token_hash));
+
+  if (!pendingReset) {
+    return res.status(400).json({ message: "Link inválido ou expirado." });
+  }
+
+  if (new Date(pendingReset.expires_at).getTime() < Date.now()) {
+    await pool.query("DELETE FROM pending_password_resets WHERE id = $1", [pendingReset.id]);
+    return res.status(410).json({ message: "Link expirado. Solicite uma nova recuperação." });
+  }
+
+  const userResult = await findUserById(pendingReset.user_id);
+
+  if (!userResult.rowCount) {
+    await pool.query("DELETE FROM pending_password_resets WHERE id = $1", [pendingReset.id]);
+    return res.status(404).json({ message: "Usuário não encontrado." });
+  }
+
+  await pool.query("UPDATE users SET password_hash = $2 WHERE id = $1", [
+    pendingReset.user_id,
+    hashPassword(newPassword),
+  ]);
+  await pool.query("DELETE FROM pending_password_resets WHERE user_id = $1", [pendingReset.user_id]);
+
+  return res.json({ message: "Senha redefinida com sucesso." });
 });
 
 authRouter.post("/email-change/start", requireAuth, async (req, res) => {

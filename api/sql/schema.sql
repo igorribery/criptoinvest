@@ -59,6 +59,20 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_email_changes_user_id
 CREATE INDEX IF NOT EXISTS idx_pending_email_changes_new_email
   ON pending_email_changes(new_email);
 
+CREATE TABLE IF NOT EXISTS pending_password_resets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pending_password_resets_user_id
+  ON pending_password_resets(user_id);
+CREATE INDEX IF NOT EXISTS idx_pending_password_resets_expires_at
+  ON pending_password_resets(expires_at);
+
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'asset_type') THEN

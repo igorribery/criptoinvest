@@ -25,6 +25,7 @@ export const env = {
   sesFromEmail: process.env.SES_FROM_EMAIL,
   registerCodeExpiresMinutes: Number(process.env.REGISTER_CODE_EXPIRES_MINUTES ?? 15),
   registerCodeMaxAttempts: Number(process.env.REGISTER_CODE_MAX_ATTEMPTS ?? 5),
+  passwordResetExpiresMinutes: Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES ?? 30),
 };
 
 export const isGoogleAuthEnabled = Boolean(env.googleClientId && env.googleClientSecret);

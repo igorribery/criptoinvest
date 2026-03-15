@@ -31,7 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-type Mode = "login" | "register";
+type Mode = "login" | "register" | "forgotPassword";
 type RegisterStep = "form" | "verify";
 type TransactionType = "buy" | "sell";
 
@@ -44,6 +44,10 @@ type RegisterStartResponse = {
   message: string;
   email: string;
   expiresInMinutes: number;
+};
+
+type PasswordForgotResponse = {
+  message: string;
 };
 
 type CryptoOption = {
@@ -108,6 +112,8 @@ export function AuthControls() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState<string | null>(null);
   const [verificationCode, setVerificationCode] = useState("");
   const [verificationEmail, setVerificationEmail] = useState("");
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
@@ -142,6 +148,8 @@ export function AuthControls() {
       setEmail(pendingError.email ?? "");
       setPassword("");
       setConfirmPassword("");
+      setForgotPasswordEmail(pendingError.email ?? "");
+      setForgotPasswordMessage(null);
       setVerificationCode("");
       setVerificationEmail("");
       setVerificationMessage(null);
@@ -191,6 +199,7 @@ export function AuthControls() {
 
   const title = useMemo(() => {
     if (mode === "login") return "Entrar";
+    if (mode === "forgotPassword") return "Recuperar senha";
     if (registerStep === "verify") return "Confirmar cadastro";
     return "Criar conta";
   }, [mode, registerStep]);
@@ -227,6 +236,7 @@ export function AuthControls() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setForgotPasswordMessage(null);
 
     if (mode === "register" && registerStep === "form" && password !== confirmPassword) {
       setError("As senhas precisam ser iguais.");
@@ -236,12 +246,22 @@ export function AuthControls() {
     setIsSubmitting(true);
 
     try {
+      if (mode === "forgotPassword") {
+        const payload = await api.post<PasswordForgotResponse>("/auth/password/forgot", {
+          email: forgotPasswordEmail,
+        });
+        setForgotPasswordMessage(payload.message);
+        return;
+      }
+
       if (mode === "login") {
         const payload = await api.post<AuthResponse>("/auth/login", { email, password });
         saveAuthSession(payload);
         setIsOpen(false);
         setPassword("");
         setConfirmPassword("");
+        setForgotPasswordEmail("");
+        setForgotPasswordMessage(null);
         setVerificationCode("");
         setVerificationEmail("");
         setVerificationMessage(null);
@@ -274,6 +294,8 @@ export function AuthControls() {
       setIsOpen(false);
       setPassword("");
       setConfirmPassword("");
+      setForgotPasswordEmail("");
+      setForgotPasswordMessage(null);
       setVerificationCode("");
       setVerificationEmail("");
       setVerificationMessage(null);
@@ -322,6 +344,8 @@ export function AuthControls() {
     setEmail("");
     setPassword("");
     setConfirmPassword("");
+    setForgotPasswordEmail("");
+    setForgotPasswordMessage(null);
     setVerificationCode("");
     setVerificationEmail("");
     setVerificationMessage(null);
@@ -331,7 +355,10 @@ export function AuthControls() {
 
   function backToRegisterForm() {
     setError(null);
+    setMode("login");
     setRegisterStep("form");
+    setForgotPasswordEmail("");
+    setForgotPasswordMessage(null);
     setVerificationCode("");
     setVerificationEmail("");
     setVerificationMessage(null);
@@ -373,6 +400,7 @@ export function AuthControls() {
   const totalValueLabel =
     transactionType === "buy" ? "Valor total da compra" : "Valor total da venda";
   const isRegisterMode = mode === "register";
+  const isForgotPasswordMode = mode === "forgotPassword";
   const isVerifyStep = isRegisterMode && registerStep === "verify";
   const hasStartedConfirmingPassword =
     isRegisterMode && registerStep === "form" && password.length > 0 && confirmPassword.length > 0;
@@ -478,6 +506,8 @@ export function AuthControls() {
               setEmail("");
               setPassword("");
               setConfirmPassword("");
+              setForgotPasswordEmail("");
+              setForgotPasswordMessage(null);
               setVerificationCode("");
               setVerificationEmail("");
               setVerificationMessage(null);
@@ -497,6 +527,8 @@ export function AuthControls() {
               setEmail("");
               setPassword("");
               setConfirmPassword("");
+              setForgotPasswordEmail("");
+              setForgotPasswordMessage(null);
               setVerificationCode("");
               setVerificationEmail("");
               setVerificationMessage(null);
@@ -516,7 +548,7 @@ export function AuthControls() {
         <DialogContent className="max-w-md rounded-xl p-5">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {isVerifyStep ? (
+              {isVerifyStep || isForgotPasswordMode ? (
                 <Button onClick={backToRegisterForm} size="icon" variant="ghost">
                   <ArrowLeftIcon />
                 </Button>
@@ -534,15 +566,31 @@ export function AuthControls() {
             ) : null}
 
             <Input
-              onChange={(event) => setEmail(event.target.value)}
+              onChange={(event) =>
+                isForgotPasswordMode ? setForgotPasswordEmail(event.target.value) : setEmail(event.target.value)
+              }
               placeholder="E-mail"
               required
               readOnly={isVerifyStep}
               type="email"
-              value={isVerifyStep ? verificationEmail || email : email}
+              value={isForgotPasswordMode ? forgotPasswordEmail : isVerifyStep ? verificationEmail || email : email}
             />
 
-            {isVerifyStep ? (
+            {isForgotPasswordMode ? (
+              <>
+                {forgotPasswordMessage ? (
+                  <p className="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
+                    {forgotPasswordMessage}
+                  </p>
+                ) : null}
+
+                {!forgotPasswordMessage && !error ? (
+                  <p className="text-sm text-slate-400">
+                    Informe seu e-mail e enviaremos um link para criar uma nova senha.
+                  </p>
+                ) : null}
+              </>
+            ) : isVerifyStep ? (
               <>
                 {verificationMessage ? (
                   <p className="rounded-md border border-cyan-500/20 bg-cyan-500/10 px-3 py-2 text-sm text-cyan-100">
@@ -634,20 +682,31 @@ export function AuthControls() {
 
             <Button
               className="w-full rounded-md"
-              disabled={isSubmitting || (mode === "register" && registerStep === "form" && !passwordsMatch)}
+              disabled={
+                isSubmitting ||
+                (mode === "register" && registerStep === "form" && !passwordsMatch)
+              }
               type="submit"
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-3">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
-                  <span>{isVerifyStep ? "Confirmando código..." : "Validando acesso..."}</span>
+                  <span>
+                    {isVerifyStep
+                      ? "Confirmando código..."
+                      : isForgotPasswordMode
+                        ? "Enviando instruções..."
+                        : "Validando acesso..."}
+                  </span>
                 </span>
+              ) : mode === "login" ? (
+                "Entrar"
+              ) : mode === "forgotPassword" ? (
+                "Enviar link de recuperação"
+              ) : isVerifyStep ? (
+                "Confirmar código"
               ) : (
-                mode === "login"
-                  ? "Entrar"
-                  : isVerifyStep
-                    ? "Confirmar código"
-                    : "Criar conta"
+                "Criar conta"
               )}
             </Button>
 
@@ -667,11 +726,32 @@ export function AuthControls() {
                 Reenviar código
               </Button>
             ) : null}
+
+            {mode === "login" ? (
+              <button
+                className="text-sm text-cyan-300 transition hover:text-cyan-200"
+                onClick={() => {
+                  setError(null);
+                  setPassword("");
+                  setConfirmPassword("");
+                  setForgotPasswordEmail(email);
+                  setForgotPasswordMessage(null);
+                  setVerificationCode("");
+                  setVerificationEmail("");
+                  setVerificationMessage(null);
+                  setIsPasswordVisible(false);
+                  setMode("forgotPassword");
+                }}
+                type="button"
+              >
+                Esqueceu a senha?
+              </button>
+            ) : null}
           </form>
 
-          {!isVerifyStep ? <Separator className="my-4" /> : null}
+          {!isVerifyStep && !isForgotPasswordMode ? <Separator className="my-4" /> : null}
 
-          {!isVerifyStep ? (
+          {!isVerifyStep && !isForgotPasswordMode ? (
             <Button
               className="w-full rounded-md"
               disabled={isSubmitting}
@@ -683,7 +763,7 @@ export function AuthControls() {
             </Button>
           ) : null}
 
-          {!isVerifyStep ? (
+          {!isVerifyStep && !isForgotPasswordMode ? (
             <p className="mt-3 text-center text-sm text-slate-400">
               {mode === "login" ? "Não tem conta?" : "Já tem conta?"}{" "}
               <button
@@ -693,6 +773,8 @@ export function AuthControls() {
                   setEmail("");
                   setPassword("");
                   setConfirmPassword("");
+                  setForgotPasswordEmail("");
+                  setForgotPasswordMessage(null);
                   setVerificationCode("");
                   setVerificationEmail("");
                   setVerificationMessage(null);
