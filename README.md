@@ -1,33 +1,85 @@
-# CriptoInvest
+# CriptoInvest — Crypto Portfolio + Alert System
 
-Projeto base configurado com a stack:
+Sistema para registro de compras de criptomoedas, acompanhamento de preço médio, alertas automáticos e notificações por e-mail.
 
-- Node.js
-- Next.js 14 (App Router)
-- TypeScript
-- Tailwind CSS
-- ESLint
+## Arquitetura
+
+```
+Frontend (Next.js / TypeScript)
+        ↓
+API (Node.js / Express)
+        ↓
+PostgreSQL (AWS RDS)
+        ↓
+Price Worker (cron job)
+        ↓
+SQS queue
+        ↓
+Alert Worker
+        ↓
+Email (SES)
+```
+
+## Estrutura do Projeto
+
+```
+criptoinvest/
+├── src/                 # Frontend Next.js (App Router)
+├── api/                 # API Node.js + Express
+├── workers/
+│   ├── price-worker/    # Cron job - busca preços, envia para SQS
+│   └── alert-worker/    # Consome SQS, envia emails via SES
+├── package.json
+└── README.md
+```
 
 ## Como rodar
 
-1. Instale as dependências:
+### 1. Instalar dependências
 
 ```bash
+# Root (frontend)
 npm install
+
+# API
+cd api && npm install
+
+# Price Worker
+cd workers/price-worker && npm install
+
+# Alert Worker
+cd workers/alert-worker && npm install
 ```
 
-2. Rode em desenvolvimento:
+### 2. Configurar variáveis de ambiente
+
+Copie os `.env.example` de cada pasta para `.env` e preencha:
+
+- `api/.env`
+- `workers/price-worker/.env`
+- `workers/alert-worker/.env`
+
+### 3. Subir os serviços
 
 ```bash
+# Frontend (porta 3000)
 npm run dev
-```
 
-3. Acesse `http://localhost:3000`.
+# API (porta 4000)
+cd api && npm run dev
+
+# Price Worker (cron)
+cd workers/price-worker && npm run dev
+
+# Alert Worker (SQS consumer)
+cd workers/alert-worker && npm run dev
+```
 
 ## Scripts úteis
 
-- `npm run dev` — inicia ambiente de desenvolvimento
-- `npm run build` — gera build de produção
-- `npm run start` — sobe aplicação em produção
-- `npm run lint` — roda linting
-- `npm run type-check` — valida tipos TypeScript
+| Pasta | Script | Descrição |
+|-------|--------|-----------|
+| Root | `npm run dev` | Frontend Next.js |
+| api | `npm run dev` | API Express com hot reload |
+| workers/price-worker | `npm run dev` | Worker de preços |
+| workers/alert-worker | `npm run dev` | Worker de alertas |
