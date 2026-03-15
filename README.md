@@ -53,11 +53,14 @@ cd workers/alert-worker && npm install
 
 ### 2. Configurar variáveis de ambiente
 
-Copie os `.env.example` de cada pasta para `.env` e preencha:
+Copie os arquivos de exemplo para `.env` (ou `.env.local` no frontend) e preencha:
 
-- `api/.env`
+- `api/.env` (inclui `DATABASE_URL`, `JWT_SECRET`)
 - `workers/price-worker/.env`
 - `workers/alert-worker/.env`
+- `.env.local` no frontend (ex.: `NEXT_PUBLIC_API_URL=http://localhost:4000`)
+
+> Em produção, `DATABASE_URL` e `JWT_SECRET` são obrigatórios na API.
 
 ### 3. Subir os serviços
 
@@ -75,6 +78,18 @@ cd workers/price-worker && npm run dev
 cd workers/alert-worker && npm run dev
 ```
 
+## CoinGecko (preços em BRL com cache de 24h)
+
+No frontend (`.env.local` na raiz), configure:
+
+```bash
+COINGECKO_API_KEY=CG-...
+COINGECKO_BASE_URL=https://pro-api.coingecko.com/api/v3
+COINGECKO_API_KEY_HEADER=x-cg-pro-api-key
+```
+
+A home usa o endpoint `/simple/price` com `vs_currencies=brl` e `revalidate` de 24h (uma chamada por dia por página/rota em cache, reduzindo consumo da cota).
+
 ## Scripts úteis
 
 | Pasta | Script | Descrição |
@@ -83,3 +98,29 @@ cd workers/alert-worker && npm run dev
 | api | `npm run dev` | API Express com hot reload |
 | workers/price-worker | `npm run dev` | Worker de preços |
 | workers/alert-worker | `npm run dev` | Worker de alertas |
+
+## API (implementada)
+
+A API em `api/` já possui os endpoints para:
+
+- autenticação (`/auth/register`, `/auth/login`, `/me`)
+- listagem do top 10 de cripto em BRL ou outra moeda (`/market/top-10`)
+- carteira de ativos com cálculo de preço médio (`/portfolio/entries`, `/portfolio/summary`)
+- alertas de preço (`/alerts`)
+
+### Banco de dados
+
+Execute o schema SQL:
+
+```bash
+psql "$DATABASE_URL" -f api/sql/schema.sql
+```
+
+### Exemplo rápido de fluxo
+
+1. Criar usuário em `POST /auth/register`
+2. Fazer login em `POST /auth/login`
+3. Usar `Authorization: Bearer <token>`
+4. Cadastrar compras em `POST /portfolio/entries`
+5. Consultar preço médio em `GET /portfolio/summary`
+6. Criar alertas em `POST /alerts`
