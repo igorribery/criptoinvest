@@ -1,23 +1,19 @@
 import { randomUUID } from "node:crypto";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { env } from "../config/env.js";
+import { ParsedImageType, uploadAvatarType } from "../types/storage-types.js";
 
 const s3Client = new S3Client({ region: env.awsRegion });
 
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
-type ParsedImage = {
-  buffer: Buffer;
-  mimeType: string;
-  extension: string;
-};
 
 function getPublicUrl(key: string) {
   return `https://${env.s3BucketName}.s3.${env.awsRegion}.amazonaws.com/${key}`;
 }
 
-function parseImageDataUrl(imageDataUrl: string): ParsedImage {
+function parseImageDataUrl(imageDataUrl: string): ParsedImageType {
   const match = imageDataUrl.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
 
   if (!match) {
@@ -40,13 +36,13 @@ function parseImageDataUrl(imageDataUrl: string): ParsedImage {
   return { buffer, mimeType, extension };
 }
 
-export async function uploadAvatar(userId: string, imageDataUrl: string) {
+export async function uploadAvatar(input: uploadAvatarType) {
   if (!env.s3BucketName) {
     throw new Error("S3_BUCKET_NAME nao configurado no servidor.");
   }
 
-  const parsed = parseImageDataUrl(imageDataUrl);
-  const key = `avatars/${userId}/${randomUUID()}.${parsed.extension}`;
+  const parsed = parseImageDataUrl(input.imageDataUrl);
+  const key = `avatars/${input.userId}/${randomUUID()}.${parsed.extension}`;
 
   await s3Client.send(
     new PutObjectCommand({

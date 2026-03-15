@@ -2,21 +2,15 @@ import { Router } from "express";
 import { pool } from "../db/pool.js";
 import { requireAuth } from "../middleware/auth.js";
 import { isPositiveNumber } from "../utils/validators.js";
-
-const ALLOWED_DIRECTION = ["ABOVE", "BELOW"] as const;
-const ALLOWED_FREQUENCY = ["5m", "15m", "1h", "1d"] as const;
+import { CreateAlertType, UpdateAlertType } from "../types/alerts.routes-types.js";
+import { ALLOWED_DIRECTION, ALLOWED_FREQUENCY } from "../types/alerts.routes-types.js";
 
 export const alertsRouter = Router();
 
 alertsRouter.use(requireAuth);
 
 alertsRouter.post("/", async (req, res) => {
-  const { symbol, direction, targetPriceBrl, frequency } = req.body as {
-    symbol?: string;
-    direction?: string;
-    targetPriceBrl?: number;
-    frequency?: string;
-  };
+  const { symbol, direction, targetPriceBrl, frequency } = req.body as CreateAlertType
 
   if (!symbol || !direction || !frequency || !isPositiveNumber(targetPriceBrl)) {
     return res.status(400).json({ message: "symbol, direction, targetPriceBrl e frequency são obrigatórios." });
@@ -50,7 +44,7 @@ alertsRouter.get("/", async (req, res) => {
 });
 
 alertsRouter.patch("/:id", async (req, res) => {
-  const { isActive } = req.body as { isActive?: boolean };
+  const { isActive } = req.body as UpdateAlertType;
 
   if (typeof isActive !== "boolean") {
     return res.status(400).json({ message: "isActive deve ser boolean." });

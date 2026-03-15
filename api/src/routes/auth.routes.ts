@@ -7,43 +7,9 @@ import { sendPasswordResetEmail, sendRegisterCodeEmail } from "../services/email
 import { uploadAvatar } from "../services/storage.service.js";
 import { hashPassword, signToken, verifyPassword } from "../utils/crypto.js";
 import { isValidEmail } from "../utils/validators.js";
+import { DbUser, PendingUser, PendingEmailChange, PendingPasswordReset, GoogleProfile, ResetPassword, CodeVerification, pendingChangeOwner, Login } from "../types/auth-types.js";
+import { SignToken } from "../types/cripto-types.js";
 
-type DbUser = {
-  id: string;
-  name: string;
-  email: string;
-  password_hash: string | null;
-  avatar_url: string | null;
-  google_id: string | null;
-  created_at: string;
-};
-
-type PendingUser = {
-  id: string;
-  name: string;
-  email: string;
-  password_hash: string;
-  verification_code_hash: string;
-  attempt_count: number;
-  expires_at: string;
-  created_at: string;
-};
-
-type PendingEmailChange = {
-  id: string;
-  user_id: string;
-  new_email: string;
-  verification_code_hash: string;
-  attempt_count: number;
-  expires_at: string;
-};
-
-type PendingPasswordReset = {
-  id: string;
-  user_id: string;
-  token_hash: string;
-  expires_at: string;
-};
 
 function sanitizeUser(user: DbUser, extras?: { avatarUrl?: string }) {
   return {
@@ -173,7 +139,7 @@ authRouter.post("/register/confirm", async (req, res) => {
   }
 
   const sanitizedCode = code.trim();
-  if (!verifyPassword(sanitizedCode, pendingUser.verification_code_hash)) {
+  if (!verifyPassword({ password: sanitizedCode, storedHash: pendingUser.verification_code_hash })) {
     await pool.query(
       "UPDATE pending_users SET attempt_count = attempt_count + 1, updated_at = NOW() WHERE id = $1",
       [pendingUser.id],
@@ -191,7 +157,7 @@ authRouter.post("/register/confirm", async (req, res) => {
   await pool.query("DELETE FROM pending_users WHERE id = $1", [pendingUser.id]);
 
   const user = created.rows[0] as DbUser;
-  const token = signToken(user.id, user.email);
+  const token = signToken({ userId: user.id, email: user.email } as SignToken);
 
   return res.status(201).json({ user: sanitizeUser(user), token });
 });
@@ -295,7 +261,7 @@ authRouter.post("/password/change", requireAuth, async (req, res) => {
     });
   }
 
-  if (!verifyPassword(currentPassword, user.password_hash)) {
+  if (!verifyPassword({ password: currentPassword, storedHash: user.password_hash })) {
     return res.status(401).json({ message: "Senha atual inválida." });
   }
 
@@ -385,7 +351,7 @@ authRouter.post("/password/forgot", async (req, res) => {
 });
 
 authRouter.post("/password/reset", async (req, res) => {
-  const { token, newPassword } = req.body as { token?: string; newPassword?: string };
+  const { token, newPassword } = req.body as ResetPassword
 
   if (!token || !newPassword) {
     return res.status(400).json({ message: "Token e nova senha são obrigatórios." });
@@ -405,7 +371,7 @@ authRouter.post("/password/reset", async (req, res) => {
   }
 
   const pendingResets = pendingResult.rows as PendingPasswordReset[];
-  const pendingReset = pendingResets.find((reset) => verifyPassword(token, reset.token_hash));
+  const pendingReset = pendingResets.find((reset) => verifyPassword({ password: token, storedHash: reset.token_hash }));
 
   if (!pendingReset) {
     return res.status(400).json({ message: "Link inválido ou expirado." });
@@ -433,7 +399,7 @@ authRouter.post("/password/reset", async (req, res) => {
 });
 
 authRouter.post("/email-change/start", requireAuth, async (req, res) => {
-  const { newEmail } = req.body as { newEmail?: string };
+  const { newEmail } = req.body as CodeVerification
 
   if (!newEmail) {
     return res.status(400).json({ message: "Novo e-mail é obrigatório." });
@@ -460,7 +426,7 @@ authRouter.post("/email-change/start", requireAuth, async (req, res) => {
   );
 
   if (existingPendingChange.rowCount) {
-    const pendingChangeOwner = existingPendingChange.rows[0] as { id: string; user_id: string };
+    const pendingChangeOwner = existingPendingChange.rows[0] as pendingChangeOwner;
     if (pendingChangeOwner.user_id !== req.authUser!.id) {
       return res.status(409).json({ message: "Este e-mail já está reservado em outra confirmação." });
     }
@@ -540,7 +506,7 @@ authRouter.post("/email-change/resend", requireAuth, async (req, res) => {
 });
 
 authRouter.post("/email-change/confirm", requireAuth, async (req, res) => {
-  const { code } = req.body as { code?: string };
+  const { code } = req.body as CodeVerification;
 
   if (!code) {
     return res.status(400).json({ message: "Código é obrigatório." });
@@ -576,7 +542,7 @@ authRouter.post("/email-change/confirm", requireAuth, async (req, res) => {
     }
   }
 
-  if (!verifyPassword(code.trim(), pendingChange.verification_code_hash)) {
+  if (!verifyPassword({ password: code.trim(), storedHash: pendingChange.verification_code_hash })) {
     await pool.query(
       "UPDATE pending_email_changes SET attempt_count = attempt_count + 1, updated_at = NOW() WHERE id = $1",
       [pendingChange.id],
@@ -595,7 +561,7 @@ authRouter.post("/email-change/confirm", requireAuth, async (req, res) => {
   await pool.query("DELETE FROM pending_email_changes WHERE id = $1", [pendingChange.id]);
 
   const user = updated.rows[0] as DbUser;
-  const token = signToken(user.id, user.email);
+  const token = signToken({ userId: user.id, email: user.email } as SignToken);
 
   return res.json({
     message: "E-mail atualizado com sucesso.",
@@ -605,7 +571,7 @@ authRouter.post("/email-change/confirm", requireAuth, async (req, res) => {
 });
 
 authRouter.post("/login", async (req, res) => {
-  const { email, password } = req.body as { email?: string; password?: string };
+  const { email, password } = req.body as Login;
 
   if (!email || !password) {
     return res.status(400).json({ message: "E-mail e senha são obrigatórios." });
@@ -626,11 +592,11 @@ authRouter.post("/login", async (req, res) => {
     });
   }
 
-  if (!user.password_hash || !verifyPassword(password, user.password_hash)) {
+  if (!user.password_hash || !verifyPassword({ password: password, storedHash: user.password_hash })) {
     return res.status(401).json({ message: "Credenciais inválidas." });
   }
 
-  const token = signToken(user.id, user.email);
+  const token = signToken({ userId: user.id, email: user.email });
 
   return res.json({ user: sanitizeUser(user), token });
 });
@@ -662,7 +628,7 @@ authRouter.post("/google/exchange", async (req, res) => {
     return res.status(503).json({ message: "Login com Google não está configurado no servidor." });
   }
 
-  const { code } = req.body as { code?: string };
+  const { code } = req.body as CodeVerification;
 
   if (!code) {
     return res.status(400).json({ message: "Código do Google é obrigatório." });
@@ -702,13 +668,7 @@ authRouter.post("/google/exchange", async (req, res) => {
     return res.status(401).json({ message: "Falha ao obter perfil do Google." });
   }
 
-  const profile = (await profileResponse.json()) as {
-    sub?: string;
-    name?: string;
-    email?: string;
-    email_verified?: boolean;
-    picture?: string;
-  };
+  const profile = (await profileResponse.json()) as GoogleProfile;
 
   if (!profile.sub || !profile.email || !profile.email_verified) {
     return res.status(400).json({ message: "Conta do Google sem e-mail verificado." });
@@ -752,6 +712,6 @@ authRouter.post("/google/exchange", async (req, res) => {
     }
   }
 
-  const token = signToken(user.id, user.email);
+  const token = signToken({ userId: user.id, email: user.email });
   return res.json({ user: sanitizeUser(user, { avatarUrl: profile.picture }), token });
 });
