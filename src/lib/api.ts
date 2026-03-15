@@ -4,12 +4,25 @@
  */
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000";
 
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_URL}${path}`, init);
+  const payload = (await response.json().catch(() => ({}))) as { message?: string } & T;
+
+  if (!response.ok) {
+    throw new Error(payload.message ?? `Erro HTTP ${response.status}`);
+  }
+
+  return payload;
+}
+
 export const api = {
-  get: <T>(path: string) => fetch(`${API_URL}${path}`).then((r) => r.json() as Promise<T>),
-  post: <T>(path: string, body: unknown) =>
-    fetch(`${API_URL}${path}`, {
+  get: <T>(path: string, headers?: HeadersInit) => request<T>(path, { headers }),
+  post: <T>(path: string, body: unknown, headers?: HeadersInit) =>
+    request<T>(path, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
-    }).then((r) => r.json() as Promise<T>),
+    }),
 };
+
+export { API_URL };

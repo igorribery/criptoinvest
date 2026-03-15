@@ -1,5 +1,6 @@
 export const revalidate = 60;
 
+import { AuthControls } from "@/components/auth-controls";
 import { Sparkline } from "@/components/sparkline";
 import { getHomePrices } from "@/lib/coingecko";
 import { formatCurrencyBrl, formatPercentage } from "@/utils/format";
@@ -19,7 +20,8 @@ export default async function Home() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-14 sm:px-6">
+    <main className="relative mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-14 sm:px-6">
+      <AuthControls />
       <h1 className="text-center text-4xl font-bold leading-tight sm:text-6xl">
         Criptomoedas com <span className="text-cyan-300">CriptoInvest</span>
       </h1>

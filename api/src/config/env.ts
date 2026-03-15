@@ -14,4 +14,11 @@ export const env = {
   tokenExpiresInHours: Number(process.env.TOKEN_EXPIRES_IN_HOURS ?? 24),
   coingeckoApiBaseUrl:
     process.env.COINGECKO_API_BASE_URL ?? "https://api.coingecko.com/api/v3",
+  frontendUrl: process.env.FRONTEND_URL ?? "http://localhost:3000",
+  googleClientId: process.env.GOOGLE_CLIENT_ID,
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  googleRedirectUri:
+    process.env.GOOGLE_REDIRECT_URI ?? "http://localhost:3000/auth/google/callback",
 };
+
+export const isGoogleAuthEnabled = Boolean(env.googleClientId && env.googleClientSecret);
