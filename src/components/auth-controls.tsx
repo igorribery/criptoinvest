@@ -17,6 +17,8 @@ import {
   ArrowLeftIcon,
   ChevronDownIcon,
   CircleStackIcon,
+  EyeIcon,
+  EyeOffIcon,
   HomeIcon,
   ListIcon,
   LogoutIcon,
@@ -96,6 +98,8 @@ export function AuthControls() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addCryptoMessage, setAddCryptoMessage] = useState<string | null>(null);
@@ -124,6 +128,8 @@ export function AuthControls() {
       setError(pendingError.message);
       setEmail(pendingError.email ?? "");
       setPassword("");
+      setConfirmPassword("");
+      setIsPasswordVisible(false);
       setIsOpen(true);
     };
 
@@ -201,6 +207,12 @@ export function AuthControls() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+
+    if (mode === "register" && password !== confirmPassword) {
+      setError("As senhas precisam ser iguais.");
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -212,6 +224,8 @@ export function AuthControls() {
       saveAuthSession(payload);
       setIsOpen(false);
       setPassword("");
+      setConfirmPassword("");
+      setIsPasswordVisible(false);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Falha no login.");
     } finally {
@@ -237,7 +251,9 @@ export function AuthControls() {
     setError(null);
     setEmail("");
     setPassword("");
+    setConfirmPassword("");
     setName("");
+    setIsPasswordVisible(false);
   }
 
   function logout() {
@@ -275,6 +291,12 @@ export function AuthControls() {
   const transactionDateLabel = transactionType === "buy" ? "Data da compra" : "Data da venda";
   const totalValueLabel =
     transactionType === "buy" ? "Valor total da compra" : "Valor total da venda";
+  const isRegisterMode = mode === "register";
+  const hasStartedConfirmingPassword =
+    isRegisterMode && password.length > 0 && confirmPassword.length > 0;
+  const passwordsMatch = password.length > 0 && password === confirmPassword;
+  const passwordsDoNotMatch =
+    hasStartedConfirmingPassword && password !== confirmPassword;
 
   return (
     <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
@@ -364,7 +386,9 @@ export function AuthControls() {
               setError(null);
               setEmail("");
               setPassword("");
+              setConfirmPassword("");
               setName("");
+              setIsPasswordVisible(false);
               setMode("register");
               setIsOpen(true);
             }}
@@ -377,7 +401,9 @@ export function AuthControls() {
               setError(null);
               setEmail("");
               setPassword("");
+              setConfirmPassword("");
               setName("");
+              setIsPasswordVisible(false);
               setMode("login");
               setIsOpen(true);
             }}
@@ -409,18 +435,76 @@ export function AuthControls() {
               value={email}
             />
 
-            <Input
-              minLength={6}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Senha"
-              required
-              type="password"
-              value={password}
-            />
+            <div className="relative">
+              <Input
+                className={cn(
+                  "pr-12",
+                  passwordsMatch ? "border-emerald-500 focus:border-emerald-400" : "",
+                  passwordsDoNotMatch ? "border-rose-500 focus:border-rose-400" : "",
+                )}
+                minLength={6}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="Senha"
+                required
+                type={isPasswordVisible ? "text" : "password"}
+                value={password}
+              />
+              <button
+                aria-label={isPasswordVisible ? "Ocultar senha" : "Mostrar senha"}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-cyan-300"
+                onClick={() => setIsPasswordVisible((current) => !current)}
+                type="button"
+              >
+                {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+              </button>
+            </div>
+
+            {mode === "register" ? (
+              <>
+                <div className="relative">
+                  <Input
+                    className={cn(
+                      "pr-12",
+                      passwordsMatch ? "border-emerald-500 focus:border-emerald-400" : "",
+                      passwordsDoNotMatch ? "border-rose-500 focus:border-rose-400" : "",
+                    )}
+                    minLength={6}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    placeholder="Confirmar senha"
+                    required
+                    type={isPasswordVisible ? "text" : "password"}
+                    value={confirmPassword}
+                  />
+                  <button
+                    aria-label={isPasswordVisible ? "Ocultar senha" : "Mostrar senha"}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-cyan-300"
+                    onClick={() => setIsPasswordVisible((current) => !current)}
+                    type="button"
+                  >
+                    {isPasswordVisible ? <EyeOffIcon /> : <EyeIcon />}
+                  </button>
+                </div>
+
+                {hasStartedConfirmingPassword ? (
+                  <p
+                    className={cn(
+                      "text-sm",
+                      passwordsMatch ? "text-emerald-300" : "text-rose-300",
+                    )}
+                  >
+                    {passwordsMatch ? "As senhas estao iguais." : "As senhas precisam ser iguais."}
+                  </p>
+                ) : null}
+              </>
+            ) : null}
 
             {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
-            <Button className="w-full rounded-md" disabled={isSubmitting} type="submit">
+            <Button
+              className="w-full rounded-md"
+              disabled={isSubmitting || (mode === "register" && !passwordsMatch)}
+              type="submit"
+            >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-3">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
@@ -463,7 +547,9 @@ export function AuthControls() {
                 setError(null);
                 setEmail("");
                 setPassword("");
+                setConfirmPassword("");
                 setName("");
+                setIsPasswordVisible(false);
                 setMode(mode === "login" ? "register" : "login");
               }}
               type="button"

@@ -97,3 +97,23 @@ export function CircleStackIcon({ className }: IconProps) {
     </Svg>
   );
 }
+
+export function EyeIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Svg>
+  );
+}
+
+export function EyeOffIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 3l18 18" />
+      <path d="M10.6 10.7a3 3 0 0 0 4 4" />
+      <path d="M9.9 5.1A10.9 10.9 0 0 1 12 5c6.5 0 10 7 10 7a18.3 18.3 0 0 1-3.2 4.2" />
+      <path d="M6.6 6.7C4.1 8.3 2.5 12 2.5 12A18.6 18.6 0 0 0 8 17.4" />
+    </Svg>
+  );
+}
