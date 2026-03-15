@@ -70,11 +70,11 @@ authRouter.post("/register/start", async (req, res) => {
   };
 
   if (!name || !email || !password) {
-    return res.status(400).json({ message: "name, email e password sao obrigatorios." });
+    return res.status(400).json({ message: "Nome, e-mail e senha são obrigatórios." });
   }
 
   if (!isValidEmail(email)) {
-    return res.status(400).json({ message: "Email invalido." });
+    return res.status(400).json({ message: "E-mail inválido." });
   }
 
   if (password.length < 6) {
@@ -88,8 +88,8 @@ authRouter.post("/register/start", async (req, res) => {
     const user = existingUser.rows[0] as DbUser;
     const message =
       user.google_id && !user.password_hash
-        ? "Este email ja esta cadastrado pelo Google. Entre com o Google para continuar."
-        : "Email ja cadastrado.";
+        ? "Este e-mail já está cadastrado pelo Google. Entre com o Google para continuar."
+        : "E-mail já cadastrado.";
 
     return res.status(409).json({ message });
   }
@@ -115,7 +115,7 @@ authRouter.post("/register/start", async (req, res) => {
   await sendRegisterCodeEmail(normalizedEmail, name.trim(), code);
 
   return res.status(202).json({
-    message: "Codigo de confirmacao enviado para o seu email.",
+    message: "Código de confirmação enviado para o seu e-mail.",
     email: normalizedEmail,
     expiresInMinutes: env.registerCodeExpiresMinutes,
   });
@@ -125,14 +125,14 @@ authRouter.post("/register/confirm", async (req, res) => {
   const { email, code } = req.body as { email?: string; code?: string };
 
   if (!email || !code) {
-    return res.status(400).json({ message: "email e codigo sao obrigatorios." });
+    return res.status(400).json({ message: "E-mail e código são obrigatórios." });
   }
 
   const normalizedEmail = email.trim().toLowerCase();
   const existingUser = await findExistingUserByEmail(normalizedEmail);
 
   if (existingUser.rowCount) {
-    return res.status(409).json({ message: "Email ja cadastrado." });
+    return res.status(409).json({ message: "E-mail já cadastrado." });
   }
 
   const pendingResult = await pool.query(
@@ -143,7 +143,7 @@ authRouter.post("/register/confirm", async (req, res) => {
   );
 
   if (!pendingResult.rowCount) {
-    return res.status(404).json({ message: "Cadastro pendente nao encontrado. Solicite um novo codigo." });
+    return res.status(404).json({ message: "Cadastro pendente não encontrado. Solicite um novo código." });
   }
 
   const pendingUser = pendingResult.rows[0] as PendingUser;
@@ -151,12 +151,12 @@ authRouter.post("/register/confirm", async (req, res) => {
 
   if (isExpired) {
     await pool.query("DELETE FROM pending_users WHERE id = $1", [pendingUser.id]);
-    return res.status(410).json({ message: "Codigo expirado. Solicite um novo envio." });
+    return res.status(410).json({ message: "Código expirado. Solicite um novo envio." });
   }
 
   if (pendingUser.attempt_count >= env.registerCodeMaxAttempts) {
     await pool.query("DELETE FROM pending_users WHERE id = $1", [pendingUser.id]);
-    return res.status(429).json({ message: "Limite de tentativas excedido. Solicite um novo codigo." });
+    return res.status(429).json({ message: "Limite de tentativas excedido. Solicite um novo código." });
   }
 
   const sanitizedCode = code.trim();
@@ -165,7 +165,7 @@ authRouter.post("/register/confirm", async (req, res) => {
       "UPDATE pending_users SET attempt_count = attempt_count + 1, updated_at = NOW() WHERE id = $1",
       [pendingUser.id],
     );
-    return res.status(400).json({ message: "Codigo invalido." });
+    return res.status(400).json({ message: "Código inválido." });
   }
 
   const created = await pool.query(
@@ -187,14 +187,14 @@ authRouter.post("/register/resend", async (req, res) => {
   const { email } = req.body as { email?: string };
 
   if (!email) {
-    return res.status(400).json({ message: "email e obrigatorio." });
+    return res.status(400).json({ message: "E-mail é obrigatório." });
   }
 
   const normalizedEmail = email.trim().toLowerCase();
   const existingUser = await findExistingUserByEmail(normalizedEmail);
 
   if (existingUser.rowCount) {
-    return res.status(409).json({ message: "Email ja cadastrado." });
+    return res.status(409).json({ message: "E-mail já cadastrado." });
   }
 
   const pendingResult = await pool.query(
@@ -205,7 +205,7 @@ authRouter.post("/register/resend", async (req, res) => {
   );
 
   if (!pendingResult.rowCount) {
-    return res.status(404).json({ message: "Cadastro pendente nao encontrado. Refaça o cadastro." });
+    return res.status(404).json({ message: "Cadastro pendente não encontrado. Refaça o cadastro." });
   }
 
   const pendingUser = pendingResult.rows[0] as PendingUser;
@@ -226,7 +226,7 @@ authRouter.post("/register/resend", async (req, res) => {
   await sendRegisterCodeEmail(normalizedEmail, pendingUser.name, code);
 
   return res.status(202).json({
-    message: "Novo codigo enviado para o seu email.",
+    message: "Novo código enviado para o seu e-mail.",
     email: normalizedEmail,
     expiresInMinutes: env.registerCodeExpiresMinutes,
   });
@@ -236,7 +236,7 @@ authRouter.patch("/profile", requireAuth, async (req, res) => {
   const { name } = req.body as { name?: string };
 
   if (!name?.trim()) {
-    return res.status(400).json({ message: "Nome e obrigatorio." });
+    return res.status(400).json({ message: "Nome é obrigatório." });
   }
 
   const updated = await pool.query(
@@ -248,7 +248,7 @@ authRouter.patch("/profile", requireAuth, async (req, res) => {
   );
 
   if (!updated.rowCount) {
-    return res.status(404).json({ message: "Usuario nao encontrado." });
+    return res.status(404).json({ message: "Usuário não encontrado." });
   }
 
   const user = updated.rows[0] as DbUser;
@@ -262,7 +262,7 @@ authRouter.post("/password/change", requireAuth, async (req, res) => {
   };
 
   if (!currentPassword || !newPassword) {
-    return res.status(400).json({ message: "Senha atual e nova senha sao obrigatorias." });
+    return res.status(400).json({ message: "Senha atual e nova senha são obrigatórias." });
   }
 
   if (newPassword.length < 6) {
@@ -271,19 +271,19 @@ authRouter.post("/password/change", requireAuth, async (req, res) => {
 
   const result = await findUserById(req.authUser!.id);
   if (!result.rowCount) {
-    return res.status(404).json({ message: "Usuario nao encontrado." });
+    return res.status(404).json({ message: "Usuário não encontrado." });
   }
 
   const user = result.rows[0] as DbUser;
 
   if (!user.password_hash) {
     return res.status(403).json({
-      message: "Sua conta nao possui senha local. Entre pelo Google para continuar.",
+      message: "Sua conta não possui senha local. Entre pelo Google para continuar.",
     });
   }
 
   if (!verifyPassword(currentPassword, user.password_hash)) {
-    return res.status(401).json({ message: "Senha atual invalida." });
+    return res.status(401).json({ message: "Senha atual inválida." });
   }
 
   await pool.query("UPDATE users SET password_hash = $2 WHERE id = $1", [
@@ -298,22 +298,22 @@ authRouter.post("/email-change/start", requireAuth, async (req, res) => {
   const { newEmail } = req.body as { newEmail?: string };
 
   if (!newEmail) {
-    return res.status(400).json({ message: "Novo email e obrigatorio." });
+    return res.status(400).json({ message: "Novo e-mail é obrigatório." });
   }
 
   const normalizedEmail = newEmail.trim().toLowerCase();
 
   if (!isValidEmail(normalizedEmail)) {
-    return res.status(400).json({ message: "Email invalido." });
+    return res.status(400).json({ message: "E-mail inválido." });
   }
 
   if (normalizedEmail === req.authUser!.email.toLowerCase()) {
-    return res.status(400).json({ message: "Informe um email diferente do atual." });
+    return res.status(400).json({ message: "Informe um e-mail diferente do atual." });
   }
 
   const existingUser = await findExistingUserByEmail(normalizedEmail);
   if (existingUser.rowCount) {
-    return res.status(409).json({ message: "Este email ja esta em uso." });
+    return res.status(409).json({ message: "Este e-mail já está em uso." });
   }
 
   const existingPendingChange = await pool.query(
@@ -324,13 +324,13 @@ authRouter.post("/email-change/start", requireAuth, async (req, res) => {
   if (existingPendingChange.rowCount) {
     const pendingChangeOwner = existingPendingChange.rows[0] as { id: string; user_id: string };
     if (pendingChangeOwner.user_id !== req.authUser!.id) {
-      return res.status(409).json({ message: "Este email ja esta reservado em outra confirmacao." });
+      return res.status(409).json({ message: "Este e-mail já está reservado em outra confirmação." });
     }
   }
 
   const userResult = await findUserById(req.authUser!.id);
   if (!userResult.rowCount) {
-    return res.status(404).json({ message: "Usuario nao encontrado." });
+    return res.status(404).json({ message: "Usuário não encontrado." });
   }
 
   const currentUser = userResult.rows[0] as DbUser;
@@ -353,7 +353,7 @@ authRouter.post("/email-change/start", requireAuth, async (req, res) => {
   await sendRegisterCodeEmail(normalizedEmail, currentUser.name, code);
 
   return res.status(202).json({
-    message: "Codigo enviado para confirmar o novo email.",
+    message: "Código enviado para confirmar o novo e-mail.",
     email: normalizedEmail,
     expiresInMinutes: env.registerCodeExpiresMinutes,
   });
@@ -368,13 +368,13 @@ authRouter.post("/email-change/resend", requireAuth, async (req, res) => {
   );
 
   if (!pendingResult.rowCount) {
-    return res.status(404).json({ message: "Nenhuma troca de email pendente encontrada." });
+    return res.status(404).json({ message: "Nenhuma troca de e-mail pendente encontrada." });
   }
 
   const pendingChange = pendingResult.rows[0] as PendingEmailChange;
   const userResult = await findUserById(req.authUser!.id);
   if (!userResult.rowCount) {
-    return res.status(404).json({ message: "Usuario nao encontrado." });
+    return res.status(404).json({ message: "Usuário não encontrado." });
   }
 
   const currentUser = userResult.rows[0] as DbUser;
@@ -395,7 +395,7 @@ authRouter.post("/email-change/resend", requireAuth, async (req, res) => {
   await sendRegisterCodeEmail(pendingChange.new_email, currentUser.name, code);
 
   return res.status(202).json({
-    message: "Novo codigo enviado para o email informado.",
+    message: "Novo código enviado para o e-mail informado.",
     email: pendingChange.new_email,
     expiresInMinutes: env.registerCodeExpiresMinutes,
   });
@@ -405,7 +405,7 @@ authRouter.post("/email-change/confirm", requireAuth, async (req, res) => {
   const { code } = req.body as { code?: string };
 
   if (!code) {
-    return res.status(400).json({ message: "Codigo e obrigatorio." });
+    return res.status(400).json({ message: "Código é obrigatório." });
   }
 
   const pendingResult = await pool.query(
@@ -416,25 +416,25 @@ authRouter.post("/email-change/confirm", requireAuth, async (req, res) => {
   );
 
   if (!pendingResult.rowCount) {
-    return res.status(404).json({ message: "Nenhuma troca de email pendente encontrada." });
+    return res.status(404).json({ message: "Nenhuma troca de e-mail pendente encontrada." });
   }
 
   const pendingChange = pendingResult.rows[0] as PendingEmailChange;
   if (new Date(pendingChange.expires_at).getTime() < Date.now()) {
     await pool.query("DELETE FROM pending_email_changes WHERE id = $1", [pendingChange.id]);
-    return res.status(410).json({ message: "Codigo expirado. Solicite um novo envio." });
+    return res.status(410).json({ message: "Código expirado. Solicite um novo envio." });
   }
 
   if (pendingChange.attempt_count >= env.registerCodeMaxAttempts) {
     await pool.query("DELETE FROM pending_email_changes WHERE id = $1", [pendingChange.id]);
-    return res.status(429).json({ message: "Limite de tentativas excedido. Solicite um novo codigo." });
+    return res.status(429).json({ message: "Limite de tentativas excedido. Solicite um novo código." });
   }
 
   const existingUser = await findExistingUserByEmail(pendingChange.new_email);
   if (existingUser.rowCount) {
     const user = existingUser.rows[0] as DbUser;
     if (user.id !== req.authUser!.id) {
-      return res.status(409).json({ message: "Este email ja esta em uso." });
+      return res.status(409).json({ message: "Este e-mail já está em uso." });
     }
   }
 
@@ -443,7 +443,7 @@ authRouter.post("/email-change/confirm", requireAuth, async (req, res) => {
       "UPDATE pending_email_changes SET attempt_count = attempt_count + 1, updated_at = NOW() WHERE id = $1",
       [pendingChange.id],
     );
-    return res.status(400).json({ message: "Codigo invalido." });
+    return res.status(400).json({ message: "Código inválido." });
   }
 
   const updated = await pool.query(
@@ -460,7 +460,7 @@ authRouter.post("/email-change/confirm", requireAuth, async (req, res) => {
   const token = signToken(user.id, user.email);
 
   return res.json({
-    message: "Email atualizado com sucesso.",
+    message: "E-mail atualizado com sucesso.",
     token,
     user: sanitizeUser(user),
   });
@@ -470,26 +470,26 @@ authRouter.post("/login", async (req, res) => {
   const { email, password } = req.body as { email?: string; password?: string };
 
   if (!email || !password) {
-    return res.status(400).json({ message: "email e password sao obrigatorios." });
+    return res.status(400).json({ message: "E-mail e senha são obrigatórios." });
   }
 
   const normalizedEmail = email.trim().toLowerCase();
   const result = await findExistingUserByEmail(normalizedEmail);
 
   if (!result.rowCount) {
-    return res.status(401).json({ message: "Credenciais invalidas." });
+    return res.status(401).json({ message: "Credenciais inválidas." });
   }
 
   const user = result.rows[0] as DbUser;
 
   if (!user.password_hash && user.google_id) {
     return res.status(403).json({
-      message: "Este email foi cadastrado pelo Google. Entre com o Google para continuar.",
+      message: "Este e-mail foi cadastrado pelo Google. Entre com o Google para continuar.",
     });
   }
 
   if (!user.password_hash || !verifyPassword(password, user.password_hash)) {
-    return res.status(401).json({ message: "Credenciais invalidas." });
+    return res.status(401).json({ message: "Credenciais inválidas." });
   }
 
   const token = signToken(user.id, user.email);
@@ -499,7 +499,7 @@ authRouter.post("/login", async (req, res) => {
 
 authRouter.get("/google/url", async (_req, res) => {
   if (!isGoogleAuthEnabled) {
-    return res.status(503).json({ message: "Login com Google nao esta configurado no servidor." });
+    return res.status(503).json({ message: "Login com Google não está configurado no servidor." });
   }
 
   const state = randomBytes(16).toString("hex");
@@ -521,13 +521,13 @@ authRouter.get("/google/url", async (_req, res) => {
 
 authRouter.post("/google/exchange", async (req, res) => {
   if (!isGoogleAuthEnabled) {
-    return res.status(503).json({ message: "Login com Google nao esta configurado no servidor." });
+    return res.status(503).json({ message: "Login com Google não está configurado no servidor." });
   }
 
   const { code } = req.body as { code?: string };
 
   if (!code) {
-    return res.status(400).json({ message: "Code do Google e obrigatorio." });
+    return res.status(400).json({ message: "Código do Google é obrigatório." });
   }
 
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -551,7 +551,7 @@ authRouter.post("/google/exchange", async (req, res) => {
 
   const tokenData = (await tokenResponse.json()) as { access_token?: string };
   if (!tokenData.access_token) {
-    return res.status(401).json({ message: "Google nao retornou access token." });
+    return res.status(401).json({ message: "O Google não retornou o access token." });
   }
 
   const profileResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
@@ -573,7 +573,7 @@ authRouter.post("/google/exchange", async (req, res) => {
   };
 
   if (!profile.sub || !profile.email || !profile.email_verified) {
-    return res.status(400).json({ message: "Conta Google sem email verificado." });
+    return res.status(400).json({ message: "Conta do Google sem e-mail verificado." });
   }
 
   const existingByGoogle = await pool.query(
@@ -597,7 +597,7 @@ authRouter.post("/google/exchange", async (req, res) => {
       if (!existingUser.google_id) {
         return res.status(409).json({
           message:
-            "Este email ja esta cadastrado com senha. Entre com email e senha para continuar.",
+            "Este e-mail já está cadastrado com senha. Entre com e-mail e senha para continuar.",
           email: profile.email,
         });
       }

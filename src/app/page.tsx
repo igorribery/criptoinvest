@@ -43,13 +43,13 @@ export default async function Home() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead>#</TableHead>
                   <TableHead>Moeda</TableHead>
-                  <TableHead>Preco</TableHead>
+                  <TableHead>Preço</TableHead>
                   <TableHead>1h</TableHead>
                   <TableHead>24h</TableHead>
                   <TableHead>7d</TableHead>
                   <TableHead>Volume 24h</TableHead>
                   <TableHead>Market Cap</TableHead>
-                  <TableHead className="w-24">Ultimos 7 dias</TableHead>
+                  <TableHead className="w-24">Últimos 7 dias</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

@@ -279,7 +279,7 @@ export function AuthControls() {
       setVerificationMessage(null);
       setIsPasswordVisible(false);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Falha na autenticacao.");
+      setError(requestError instanceof Error ? requestError.message : "Falha na autenticação.");
     } finally {
       setIsSubmitting(false);
     }
@@ -296,7 +296,7 @@ export function AuthControls() {
       setVerificationEmail(payload.email);
       setVerificationMessage(payload.message);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : "Falha ao reenviar o codigo.");
+      setError(requestError instanceof Error ? requestError.message : "Falha ao reenviar o código.");
     } finally {
       setIsSubmitting(false);
     }
@@ -357,7 +357,7 @@ export function AuthControls() {
   function handleAddCryptoSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setAddCryptoMessage(
-      "Modal pronto para integrar com a pagina de lancamentos. No proximo passo conectamos ao backend.",
+      "Modal pronto para integrar com a página de lançamentos. No próximo passo, conectamos ao backend.",
     );
   }
 
@@ -452,7 +452,7 @@ export function AuthControls() {
                   href="/configuracoes"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <span>Configuracoes</span>
+                  <span>Configurações</span>
                   <SettingsIcon className="text-cyan-400" />
                 </Link>
 
@@ -535,7 +535,7 @@ export function AuthControls() {
 
             <Input
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="Email"
+              placeholder="E-mail"
               required
               readOnly={isVerifyStep}
               type="email"
@@ -554,13 +554,13 @@ export function AuthControls() {
                   inputMode="numeric"
                   maxLength={6}
                   onChange={(event) => setVerificationCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="Codigo de 6 digitos"
+                  placeholder="Código de 6 dígitos"
                   required
                   value={verificationCode}
                 />
 
                 <p className="text-sm text-slate-400">
-                  Digite o codigo que enviamos para o seu email para concluir o cadastro.
+                  Digite o código que enviamos para o seu e-mail para concluir o cadastro.
                 </p>
               </>
             ) : (
@@ -622,7 +622,7 @@ export function AuthControls() {
                           passwordsMatch ? "text-emerald-300" : "text-rose-300",
                         )}
                       >
-                        {passwordsMatch ? "As senhas estao iguais." : "As senhas precisam ser iguais."}
+                        {passwordsMatch ? "As senhas estão iguais." : "As senhas precisam ser iguais."}
                       </p>
                     ) : null}
                   </>
@@ -640,13 +640,13 @@ export function AuthControls() {
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-3">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
-                  <span>{isVerifyStep ? "Confirmando codigo..." : "Validando acesso..."}</span>
+                  <span>{isVerifyStep ? "Confirmando código..." : "Validando acesso..."}</span>
                 </span>
               ) : (
                 mode === "login"
                   ? "Entrar"
                   : isVerifyStep
-                    ? "Confirmar codigo"
+                    ? "Confirmar código"
                     : "Criar conta"
               )}
             </Button>
@@ -657,14 +657,14 @@ export function AuthControls() {
                   <div className="h-full w-1/3 animate-pulse rounded-full bg-cyan-400" />
                 </div>
                 <p className="text-center text-xs text-cyan-100">
-                  Estamos verificando suas credenciais com seguranca.
+                  Estamos verificando suas credenciais com segurança.
                 </p>
               </div>
             ) : null}
 
             {isVerifyStep ? (
               <Button className="w-full rounded-md" disabled={isSubmitting} onClick={handleResendCode} type="button" variant="outline">
-                Reenviar codigo
+                Reenviar código
               </Button>
             ) : null}
           </form>
@@ -685,7 +685,7 @@ export function AuthControls() {
 
           {!isVerifyStep ? (
             <p className="mt-3 text-center text-sm text-slate-400">
-              {mode === "login" ? "Nao tem conta?" : "Ja tem conta?"}{" "}
+              {mode === "login" ? "Não tem conta?" : "Já tem conta?"}{" "}
               <button
                 className="text-cyan-300 hover:text-cyan-200"
                 onClick={() => {
@@ -715,7 +715,7 @@ export function AuthControls() {
           <DialogHeader>
             <div>
               <DialogDescription>Carteira</DialogDescription>
-              <DialogTitle>Adicionar transacao</DialogTitle>
+              <DialogTitle>Adicionar transação</DialogTitle>
             </div>
             <Button onClick={() => setIsAddCryptoOpen(false)} size="icon" variant="outline">
               <XIcon />
@@ -815,7 +815,7 @@ export function AuthControls() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
-                <Label>Preco em R$</Label>
+                <Label>Preço em R$</Label>
                 <Input
                   onChange={(event) =>
                     setAddCryptoForm((current) => ({ ...current, unitPriceBrl: event.target.value }))

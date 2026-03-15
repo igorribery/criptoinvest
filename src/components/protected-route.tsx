@@ -31,7 +31,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex min-h-screen items-center justify-center px-4">
         <div className="rounded-full border border-cyan-500/20 bg-slate-950/80 px-5 py-3 text-sm text-cyan-100">
-          Validando sua sessao...
+          Validando sua sessão...
         </div>
       </div>
     );

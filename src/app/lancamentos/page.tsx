@@ -16,17 +16,17 @@ export default function LancamentosPage() {
               >
                 <ArrowLeftIcon />
               </Link>
-              <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Movimentacoes</p>
+              <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Movimentações</p>
             </div>
 
-            <h1 className="mt-4 text-4xl font-bold">Lancamentos</h1>
+            <h1 className="mt-4 text-4xl font-bold">Lançamentos</h1>
             <p className="mt-4 max-w-2xl text-slate-300">
-              Esta pagina vai listar compras e vendas registradas pelo usuario. O modal de adicionar
-              transacao ja ficou preparado para alimentar essa tela no proximo passo.
+              Esta página vai listar compras e vendas registradas pelo usuário. O modal de adicionar
+              transação já ficou preparado para alimentar essa tela no próximo passo.
             </p>
 
             <CardContent className="mt-8 rounded-2xl border border-dashed border-slate-700 bg-slate-950/40 p-8 text-center">
-              <p className="text-lg font-medium">Nenhum lancamento registrado ainda</p>
+              <p className="text-lg font-medium">Nenhum lançamento registrado ainda</p>
               <p className="mt-2 text-slate-400">
                 Use o menu do perfil para abrir "Adicionar criptos" e criar a primeira compra ou venda.
               </p>

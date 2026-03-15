@@ -16,13 +16,13 @@ export default function MinhasCriptosPage() {
               >
                 <ArrowLeftIcon />
               </Link>
-              <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Area do investidor</p>
+              <p className="text-sm uppercase tracking-[0.3em] text-cyan-300">Área do investidor</p>
             </div>
 
             <h1 className="mt-4 text-4xl font-bold">Minhas criptos</h1>
             <p className="mt-4 max-w-2xl text-slate-300">
-              Esta tela vai reunir os ativos cadastrados pelo usuario, com quantidade, preco medio e
-              evolucao da carteira. Por enquanto, deixei a estrutura pronta para conectarmos os dados no proximo passo.
+              Esta tela vai reunir os ativos cadastrados pelo usuário, com quantidade, preço médio e
+              evolução da carteira. Por enquanto, deixei a estrutura pronta para conectarmos os dados no próximo passo.
             </p>
 
             <div className="mt-10 grid gap-4 md:grid-cols-3">

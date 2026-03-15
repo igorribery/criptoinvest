@@ -20,7 +20,7 @@ export default function GoogleCallbackPage() {
     const code = searchParams.get("code");
 
     if (!code) {
-      saveAuthError("Google nao retornou um codigo de autenticacao.");
+      saveAuthError("O Google não retornou um código de autenticação.");
       setHasRedirectedOnError(true);
       router.replace("/");
       return;

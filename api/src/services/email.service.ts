@@ -5,31 +5,31 @@ const sesClient = new SESv2Client({ region: env.awsRegion });
 
 export async function sendRegisterCodeEmail(email: string, name: string, code: string) {
   if (!isSesEnabled) {
-    throw new Error("AWS SES nao esta configurado no servidor.");
+    throw new Error("AWS SES não está configurado no servidor.");
   }
 
-  const subject = "Seu codigo de confirmacao - CriptoInvest";
+  const subject = "Seu código de confirmação - CriptoInvest";
   const greetingName = name.trim() || "investidor";
   const expiresInMinutes = env.registerCodeExpiresMinutes;
 
   const textBody = [
-    `Ola, ${greetingName}!`,
+    `Olá, ${greetingName}!`,
     "",
-    "Seu codigo de confirmacao do CriptoInvest e:",
+    "Seu código de confirmação do CriptoInvest é:",
     code,
     "",
-    `Esse codigo expira em ${expiresInMinutes} minutos.`,
-    "Se voce nao iniciou este cadastro, ignore este email.",
+    `Esse código expira em ${expiresInMinutes} minutos.`,
+    "Se você não iniciou este cadastro, ignore este e-mail.",
   ].join("\n");
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
       <h2 style="margin-bottom: 12px;">Confirme seu cadastro</h2>
-      <p>Ola, ${greetingName}!</p>
-      <p>Seu codigo de confirmacao do <strong>CriptoInvest</strong> e:</p>
+      <p>Olá, ${greetingName}!</p>
+      <p>Seu código de confirmação do <strong>CriptoInvest</strong> é:</p>
       <p style="font-size: 32px; font-weight: bold; letter-spacing: 6px; margin: 24px 0;">${code}</p>
-      <p>Esse codigo expira em ${expiresInMinutes} minutos.</p>
-      <p>Se voce nao iniciou este cadastro, ignore este email.</p>
+      <p>Esse código expira em ${expiresInMinutes} minutos.</p>
+      <p>Se você não iniciou este cadastro, ignore este e-mail.</p>
     </div>
   `;
 

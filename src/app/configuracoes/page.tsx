@@ -141,7 +141,7 @@ export default function ConfiguracoesPage() {
     } catch (error) {
       setProfileMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Nao foi possivel atualizar o nome.",
+        text: error instanceof Error ? error.message : "Não foi possível atualizar o nome.",
       });
     } finally {
       setIsSavingProfile(false);
@@ -153,7 +153,7 @@ export default function ConfiguracoesPage() {
     setPasswordMessage(null);
 
     if (newPassword !== confirmNewPassword) {
-      setPasswordMessage({ type: "error", text: "A confirmacao da senha nao confere." });
+      setPasswordMessage({ type: "error", text: "A confirmação da senha não confere." });
       return;
     }
 
@@ -173,7 +173,7 @@ export default function ConfiguracoesPage() {
     } catch (error) {
       setPasswordMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Nao foi possivel atualizar a senha.",
+        text: error instanceof Error ? error.message : "Não foi possível atualizar a senha.",
       });
     } finally {
       setIsSavingPassword(false);
@@ -198,7 +198,7 @@ export default function ConfiguracoesPage() {
     } catch (error) {
       setEmailMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Nao foi possivel iniciar a troca de email.",
+        text: error instanceof Error ? error.message : "Não foi possível iniciar a troca de e-mail.",
       });
     } finally {
       setIsSendingEmailCode(false);
@@ -226,12 +226,12 @@ export default function ConfiguracoesPage() {
       updateAuthUser(payload.user, payload.token);
       setEmailMessage({
         type: "success",
-        text: payload.message ?? "Email atualizado com sucesso.",
+        text: payload.message ?? "E-mail atualizado com sucesso.",
       });
     } catch (error) {
       setEmailMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Nao foi possivel confirmar o novo email.",
+        text: error instanceof Error ? error.message : "Não foi possível confirmar o novo e-mail.",
       });
     } finally {
       setIsConfirmingEmail(false);
@@ -254,7 +254,7 @@ export default function ConfiguracoesPage() {
     } catch (error) {
       setEmailMessage({
         type: "error",
-        text: error instanceof Error ? error.message : "Nao foi possivel reenviar o codigo.",
+        text: error instanceof Error ? error.message : "Não foi possível reenviar o código.",
       });
     } finally {
       setIsSendingEmailCode(false);
@@ -266,7 +266,7 @@ export default function ConfiguracoesPage() {
       <ProtectedRoute>
         <main className="mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-4 py-16 sm:px-6">
           <div className="rounded-full border border-cyan-500/20 bg-slate-950/80 px-5 py-3 text-sm text-cyan-100">
-            Carregando configuracoes da conta...
+            Carregando configurações da conta...
           </div>
         </main>
       </ProtectedRoute>
@@ -283,14 +283,10 @@ export default function ConfiguracoesPage() {
             </Button>
             <div>
               <p className="text-xs uppercase tracking-[0.35em] text-cyan-300/80">Painel da conta</p>
-              <h1 className="mt-2 text-3xl font-semibold text-white sm:text-4xl">Configuracoes</h1>
+              <h1 className="mt-2 text-3xl font-semibold text-white sm:text-4xl">Configurações</h1>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 rounded-full border border-cyan-500/20 bg-slate-950/80 px-4 py-2 text-sm text-slate-300">
-            <SettingsIcon className="text-cyan-300" />
-            Seus dados ja aparecem preenchidos para facilitar os ajustes.
-          </div>
         </div>
 
         <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
@@ -300,7 +296,7 @@ export default function ConfiguracoesPage() {
                 <p className="text-xs uppercase tracking-[0.35em] text-cyan-300/75">Resumo</p>
                 <h2 className="mt-3 text-2xl font-semibold text-white">Sua identidade</h2>
                 <p className="mt-2 text-sm text-slate-300">
-                  Edite nome, senha e email com confirmacao para manter a conta protegida.
+                  Edite nome, senha e e-mail com confirmação para manter a conta protegida.
                 </p>
               </div>
 
@@ -320,7 +316,7 @@ export default function ConfiguracoesPage() {
                   <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
                     <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Foto</p>
                     <p className="mt-2 text-sm text-slate-300">
-                      O upload da foto vai entrar no proximo passo com integracao no AWS S3.
+                      O upload da foto vai entrar no próximo passo com integração no AWS S3.
                     </p>
                   </div>
                 </div>
@@ -333,9 +329,9 @@ export default function ConfiguracoesPage() {
               <CardContent className="p-6 sm:p-8">
                 <div className="mb-6">
                   <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/80">Perfil</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-white">Informacoes pessoais</h2>
+                  <h2 className="mt-2 text-2xl font-semibold text-white">Informações pessoais</h2>
                   <p className="mt-2 text-sm text-slate-400">
-                    Atualize seu nome de exibicao. O avatar continua usando as iniciais por enquanto.
+                    Atualize seu nome de exibição. O avatar continua usando as iniciais por enquanto.
                   </p>
                 </div>
 
@@ -369,7 +365,7 @@ export default function ConfiguracoesPage() {
                   <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/80">Seguranca</p>
                   <h2 className="mt-2 text-2xl font-semibold text-white">Trocar senha</h2>
                   <p className="mt-2 text-sm text-slate-400">
-                    Informe sua senha atual e defina uma nova combinacao para continuar protegendo sua conta.
+                    Informe sua senha atual e defina uma nova combinação para continuar protegendo sua conta.
                   </p>
                 </div>
 
@@ -442,9 +438,9 @@ export default function ConfiguracoesPage() {
               <CardContent className="p-6 sm:p-8">
                 <div className="mb-6">
                   <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/80">E-mail</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-white">Trocar e-mail com confirmacao</h2>
+                  <h2 className="mt-2 text-2xl font-semibold text-white">Trocar e-mail com confirmação</h2>
                   <p className="mt-2 text-sm text-slate-400">
-                    Assim que voce informar um novo e-mail, enviaremos um codigo para confirmar a troca.
+                    Assim que você informar um novo e-mail, enviaremos um código para confirmar a troca.
                   </p>
                 </div>
 
@@ -468,7 +464,7 @@ export default function ConfiguracoesPage() {
                         type="submit"
                         variant="outline"
                       >
-                        {isSendingEmailCode ? "Enviando codigo..." : "Enviar codigo"}
+                        {isSendingEmailCode ? "Enviando código..." : "Enviar código"}
                       </Button>
                     </div>
                   </div>
@@ -486,7 +482,7 @@ export default function ConfiguracoesPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="email-code">Codigo</Label>
+                        <Label htmlFor="email-code">Código</Label>
                         <Input
                           id="email-code"
                           inputMode="numeric"
@@ -507,11 +503,11 @@ export default function ConfiguracoesPage() {
 
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-sm text-slate-400">
-                        O login continuara funcionando normalmente. A sessao sera atualizada assim que o codigo for validado.
+                        O login continuará funcionando normalmente. A sessão será atualizada assim que o código for validado.
                       </p>
 
                       <Button disabled={isSendingEmailCode} onClick={handleEmailResend} type="button" variant="ghost">
-                        Reenviar codigo
+                        Reenviar código
                       </Button>
                     </div>
                   </form>
