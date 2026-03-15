@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.892.0",
     "@aws-sdk/client-sesv2": "^3.892.0",
     "express": "^4.21.0",
     "pg": "^8.13.0",

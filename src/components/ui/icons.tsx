@@ -126,3 +126,13 @@ export function SettingsIcon({ className }: IconProps) {
     </Svg>
   );
 }
+
+export function PencilIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M12 20h9" />
+      <path d="m16.5 3.5 4 4" />
+      <path d="M4 16.5V20h3.5L18.8 8.7a2.1 2.1 0 0 0-3-3L4.5 17z" />
+    </Svg>
+  );
+}

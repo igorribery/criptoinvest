@@ -1,14 +1,14 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProtectedRoute } from "@/components/protected-route";
-import { ArrowLeftIcon, SettingsIcon } from "@/components/ui/icons";
+import { ArrowLeftIcon, PencilIcon, SettingsIcon } from "@/components/ui/icons";
 import { api } from "@/lib/api";
 import { AuthUser, getAuthSession, updateAuthUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,11 @@ type AuthResponse = {
   token: string;
   user: AuthUser;
   message?: string;
+};
+
+type AvatarUploadResponse = {
+  message: string;
+  user: AuthUser;
 };
 
 type MessageState = {
@@ -58,9 +63,11 @@ export default function ConfiguracoesPage() {
   const [name, setName] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
   const [isSendingEmailCode, setIsSendingEmailCode] = useState(false);
   const [isConfirmingEmail, setIsConfirmingEmail] = useState(false);
+  const [avatarMessage, setAvatarMessage] = useState<MessageState | null>(null);
   const [profileMessage, setProfileMessage] = useState<MessageState | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<MessageState | null>(null);
   const [emailMessage, setEmailMessage] = useState<MessageState | null>(null);
@@ -70,6 +77,15 @@ export default function ConfiguracoesPage() {
   const [newEmail, setNewEmail] = useState("");
   const [emailCode, setEmailCode] = useState("");
   const [pendingEmail, setPendingEmail] = useState("");
+
+  async function fileToDataUrl(file: File) {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => reject(new Error("Nao foi possivel ler a imagem."));
+      reader.readAsDataURL(file);
+    });
+  }
 
   useEffect(() => {
     const session = getAuthSession();
@@ -117,6 +133,18 @@ export default function ConfiguracoesPage() {
     window.addEventListener("auth:changed", handleAuthChanged);
     return () => window.removeEventListener("auth:changed", handleAuthChanged);
   }, [pendingEmail, router]);
+
+  useEffect(() => {
+    if (avatarMessage?.type !== "success") {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setAvatarMessage(null);
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [avatarMessage]);
 
   const passwordsMatch = useMemo(
     () => newPassword.length > 0 && newPassword === confirmNewPassword,
@@ -177,6 +205,43 @@ export default function ConfiguracoesPage() {
       });
     } finally {
       setIsSavingPassword(false);
+    }
+  }
+
+  async function handleAvatarChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    setAvatarMessage(null);
+
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      setAvatarMessage({ type: "error", text: "Selecione uma imagem JPG, PNG ou WEBP." });
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+
+    try {
+      const imageDataUrl = await fileToDataUrl(file);
+      const payload = await api.post<AvatarUploadResponse>(
+        "/auth/profile/avatar",
+        { imageDataUrl },
+        { Authorization: `Bearer ${token}` },
+      );
+
+      setUser(payload.user);
+      updateAuthUser(payload.user, token);
+      setAvatarMessage({ type: "success", text: payload.message });
+    } catch (error) {
+      setAvatarMessage({
+        type: "error",
+        text: error instanceof Error ? error.message : "Nao foi possivel atualizar a foto.",
+      });
+    } finally {
+      setIsUploadingAvatar(false);
     }
   }
 
@@ -302,22 +367,39 @@ export default function ConfiguracoesPage() {
 
               <div className="px-6 py-8">
                 <div className="rounded-[2rem] border border-cyan-500/15 bg-slate-950/80 p-6">
-                  <Avatar className="mx-auto h-24 w-24 border border-cyan-500/30 bg-slate-900">
-                    <AvatarFallback className="bg-transparent text-2xl font-semibold text-cyan-200">
-                      {getUserInitials(user.name)}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="relative mx-auto h-24 w-24">
+                    <Avatar className="h-24 w-24 border border-cyan-500/30 bg-slate-900">
+                      {user.avatarUrl ? <AvatarImage alt={`Foto de ${user.name}`} src={user.avatarUrl} /> : null}
+                      <AvatarFallback className="bg-transparent text-2xl font-semibold text-cyan-200">
+                        {getUserInitials(user.name)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <Label
+                      className={cn(
+                        "absolute -bottom-1 -right-1 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-cyan-400/30 bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-950/30 transition hover:scale-105 hover:bg-cyan-300",
+                        isUploadingAvatar ? "cursor-wait opacity-70" : "",
+                      )}
+                      htmlFor="avatar-upload"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </Label>
+                    <Input
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      disabled={isUploadingAvatar}
+                      id="avatar-upload"
+                      onChange={handleAvatarChange}
+                      type="file"
+                    />
+                  </div>
 
                   <div className="mt-5 text-center">
                     <p className="text-lg font-semibold text-white">{user.name}</p>
                     <p className="mt-1 break-all text-sm text-slate-400">{user.email}</p>
                   </div>
 
-                  <div className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/80 p-4">
-                    <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Foto</p>
-                    <p className="mt-2 text-sm text-slate-300">
-                      O upload da foto vai entrar no próximo passo com integração no AWS S3.
-                    </p>
+                  <div className="mt-5">
+                    <SectionMessage message={avatarMessage} />
                   </div>
                 </div>
               </div>

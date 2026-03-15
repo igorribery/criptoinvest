@@ -10,7 +10,7 @@ import { portfolioRouter } from "./routes/portfolio.routes.js";
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: "3mb" }));
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", env.frontendUrl);
   res.header("Vary", "Origin");
@@ -40,7 +40,7 @@ app.use("/alerts", alertsRouter);
 
 app.get("/me", requireAuth, async (req, res) => {
   const result = await pool.query(
-    `SELECT id, name, email, created_at AS "createdAt"
+    `SELECT id, name, email, avatar_url AS "avatarUrl", created_at AS "createdAt"
      FROM users
      WHERE id = $1`,
     [req.authUser!.id],

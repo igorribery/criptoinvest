@@ -18,7 +18,25 @@ export function AvatarImage({
   alt,
   ...props
 }: React.ImgHTMLAttributes<HTMLImageElement>) {
-  return <img alt={alt} className={cn("h-full w-full object-cover", className)} {...props} />;
+  const [hasError, setHasError] = React.useState(false);
+  const src = props.src;
+
+  React.useEffect(() => {
+    setHasError(false);
+  }, [src]);
+
+  if (hasError || !src) {
+    return null;
+  }
+
+  return (
+    <img
+      alt={alt}
+      className={cn("h-full w-full object-cover", className)}
+      onError={() => setHasError(true)}
+      {...props}
+    />
+  );
 }
 
 export function AvatarFallback({ className, ...props }: React.HTMLAttributes<HTMLSpanElement>) {

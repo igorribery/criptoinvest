@@ -23,6 +23,7 @@ export const env = {
     process.env.GOOGLE_REDIRECT_URI ?? "http://localhost:3000/auth/google/callback",
   awsRegion: process.env.AWS_REGION ?? "us-east-1",
   sesFromEmail: process.env.SES_FROM_EMAIL,
+  s3BucketName: process.env.S3_BUCKET_NAME,
   registerCodeExpiresMinutes: Number(process.env.REGISTER_CODE_EXPIRES_MINUTES ?? 15),
   registerCodeMaxAttempts: Number(process.env.REGISTER_CODE_MAX_ATTEMPTS ?? 5),
   passwordResetExpiresMinutes: Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES ?? 30),

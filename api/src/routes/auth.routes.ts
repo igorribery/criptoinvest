@@ -4,6 +4,7 @@ import { env, isGoogleAuthEnabled } from "../config/env.js";
 import { pool } from "../db/pool.js";
 import { requireAuth } from "../middleware/auth.js";
 import { sendPasswordResetEmail, sendRegisterCodeEmail } from "../services/email.service.js";
+import { uploadAvatar } from "../services/storage.service.js";
 import { hashPassword, signToken, verifyPassword } from "../utils/crypto.js";
 import { isValidEmail } from "../utils/validators.js";
 
@@ -12,6 +13,7 @@ type DbUser = {
   name: string;
   email: string;
   password_hash: string | null;
+  avatar_url: string | null;
   google_id: string | null;
   created_at: string;
 };
@@ -49,7 +51,7 @@ function sanitizeUser(user: DbUser, extras?: { avatarUrl?: string }) {
     name: user.name,
     email: user.email,
     createdAt: user.created_at,
-    avatarUrl: extras?.avatarUrl,
+    avatarUrl: user.avatar_url ?? extras?.avatarUrl,
   };
 }
 
@@ -64,13 +66,13 @@ function generateResetToken() {
 }
 
 async function findExistingUserByEmail(email: string) {
-  return pool.query("SELECT id, name, email, password_hash, google_id, created_at FROM users WHERE email = $1", [
+  return pool.query("SELECT id, name, email, password_hash, avatar_url, google_id, created_at FROM users WHERE email = $1", [
     email,
   ]);
 }
 
 async function findUserById(userId: string) {
-  return pool.query("SELECT id, name, email, password_hash, google_id, created_at FROM users WHERE id = $1", [userId]);
+  return pool.query("SELECT id, name, email, password_hash, avatar_url, google_id, created_at FROM users WHERE id = $1", [userId]);
 }
 
 authRouter.post("/register/start", async (req, res) => {
@@ -182,7 +184,7 @@ authRouter.post("/register/confirm", async (req, res) => {
   const created = await pool.query(
     `INSERT INTO users (name, email, password_hash)
      VALUES ($1, $2, $3)
-     RETURNING id, name, email, password_hash, google_id, created_at`,
+     RETURNING id, name, email, password_hash, avatar_url, google_id, created_at`,
     [pendingUser.name, pendingUser.email, pendingUser.password_hash],
   );
 
@@ -254,7 +256,7 @@ authRouter.patch("/profile", requireAuth, async (req, res) => {
     `UPDATE users
      SET name = $2
      WHERE id = $1
-     RETURNING id, name, email, password_hash, google_id, created_at`,
+     RETURNING id, name, email, password_hash, avatar_url, google_id, created_at`,
     [req.authUser!.id, name.trim()],
   );
 
@@ -303,6 +305,32 @@ authRouter.post("/password/change", requireAuth, async (req, res) => {
   ]);
 
   return res.json({ message: "Senha atualizada com sucesso." });
+});
+
+authRouter.post("/profile/avatar", requireAuth, async (req, res) => {
+  const { imageDataUrl } = req.body as { imageDataUrl?: string };
+
+  if (!imageDataUrl) {
+    return res.status(400).json({ message: "Imagem obrigatoria." });
+  }
+
+  const avatarUrl = await uploadAvatar(req.authUser!.id, imageDataUrl);
+  const updated = await pool.query(
+    `UPDATE users
+     SET avatar_url = $2
+     WHERE id = $1
+     RETURNING id, name, email, password_hash, avatar_url, google_id, created_at`,
+    [req.authUser!.id, avatarUrl],
+  );
+
+  if (!updated.rowCount) {
+    return res.status(404).json({ message: "Usuario nao encontrado." });
+  }
+
+  return res.json({
+    message: "Foto de perfil atualizada com sucesso.",
+    user: sanitizeUser(updated.rows[0] as DbUser),
+  });
 });
 
 authRouter.post("/password/forgot", async (req, res) => {
@@ -560,7 +588,7 @@ authRouter.post("/email-change/confirm", requireAuth, async (req, res) => {
     `UPDATE users
      SET email = $2
      WHERE id = $1
-     RETURNING id, name, email, password_hash, google_id, created_at`,
+     RETURNING id, name, email, password_hash, avatar_url, google_id, created_at`,
     [req.authUser!.id, pendingChange.new_email],
   );
 
@@ -687,7 +715,7 @@ authRouter.post("/google/exchange", async (req, res) => {
   }
 
   const existingByGoogle = await pool.query(
-    "SELECT id, name, email, password_hash, google_id, created_at FROM users WHERE google_id = $1",
+    "SELECT id, name, email, password_hash, avatar_url, google_id, created_at FROM users WHERE google_id = $1",
     [profile.sub],
   );
 
@@ -697,7 +725,7 @@ authRouter.post("/google/exchange", async (req, res) => {
     user = existingByGoogle.rows[0] as DbUser;
   } else {
     const existingByEmail = await pool.query(
-      "SELECT id, name, email, password_hash, google_id, created_at FROM users WHERE email = $1",
+      "SELECT id, name, email, password_hash, avatar_url, google_id, created_at FROM users WHERE email = $1",
       [profile.email],
     );
 
@@ -717,7 +745,7 @@ authRouter.post("/google/exchange", async (req, res) => {
       const created = await pool.query(
         `INSERT INTO users (name, email, google_id)
          VALUES ($1, $2, $3)
-         RETURNING id, name, email, password_hash, google_id, created_at`,
+         RETURNING id, name, email, password_hash, avatar_url, google_id, created_at`,
         [profile.name ?? profile.email.split("@")[0], profile.email, profile.sub],
       );
       user = created.rows[0] as DbUser;
