@@ -1,0 +1,99 @@
+import { cn } from "@/lib/utils";
+
+type IconProps = {
+  className?: string;
+};
+
+function Svg({ className, children }: React.PropsWithChildren<IconProps>) {
+  return (
+    <svg
+      className={cn("h-4 w-4", className)}
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      {children}
+    </svg>
+  );
+}
+
+export function ChevronDownIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="m6 9 6 6 6-6" />
+    </Svg>
+  );
+}
+
+export function ArrowLeftIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M19 12H5" />
+      <path d="m12 19-7-7 7-7" />
+    </Svg>
+  );
+}
+
+export function HomeIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M3 10.5 12 3l9 7.5" />
+      <path d="M5 9.5V21h14V9.5" />
+      <path d="M9 21v-6h6v6" />
+    </Svg>
+  );
+}
+
+export function XIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M18 6 6 18" />
+      <path d="m6 6 12 12" />
+    </Svg>
+  );
+}
+
+export function PlusIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </Svg>
+  );
+}
+
+export function LogoutIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <path d="m16 17 5-5-5-5" />
+      <path d="M21 12H9" />
+    </Svg>
+  );
+}
+
+export function ListIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <path d="M8 6h13" />
+      <path d="M8 12h13" />
+      <path d="M8 18h13" />
+      <path d="M3 6h.01" />
+      <path d="M3 12h.01" />
+      <path d="M3 18h.01" />
+    </Svg>
+  );
+}
+
+export function CircleStackIcon({ className }: IconProps) {
+  return (
+    <Svg className={className}>
+      <ellipse cx="12" cy="5" rx="7" ry="3" />
+      <path d="M5 5v6c0 1.7 3.1 3 7 3s7-1.3 7-3V5" />
+      <path d="M5 11v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
+    </Svg>
+  );
+}

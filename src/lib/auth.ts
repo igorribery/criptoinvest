@@ -3,6 +3,7 @@ export type AuthUser = {
   name: string;
   email: string;
   createdAt: string;
+  avatarUrl?: string;
 };
 
 type AuthSession = {
@@ -12,6 +13,11 @@ type AuthSession = {
 
 const AUTH_STORAGE_KEY = "criptoinvest.auth";
 const AUTH_ERROR_STORAGE_KEY = "criptoinvest.auth.error";
+
+type PendingAuthError = {
+  message: string;
+  email?: string;
+};
 
 export function saveAuthSession(session: AuthSession) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
@@ -35,16 +41,29 @@ export function clearAuthSession() {
   window.dispatchEvent(new Event("auth:changed"));
 }
 
-export function saveAuthError(message: string) {
-  sessionStorage.setItem(AUTH_ERROR_STORAGE_KEY, message);
+export function saveAuthError(message: string, email?: string) {
+  const payload: PendingAuthError = { message, email };
+  sessionStorage.setItem(AUTH_ERROR_STORAGE_KEY, JSON.stringify(payload));
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("auth:error"));
+  }
 }
 
 export function consumeAuthError() {
-  const message = sessionStorage.getItem(AUTH_ERROR_STORAGE_KEY);
+  const raw = sessionStorage.getItem(AUTH_ERROR_STORAGE_KEY);
 
-  if (message) {
+  if (raw) {
     sessionStorage.removeItem(AUTH_ERROR_STORAGE_KEY);
   }
 
-  return message;
+  if (!raw) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(raw) as PendingAuthError;
+  } catch {
+    return { message: raw };
+  }
 }

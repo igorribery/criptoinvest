@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import {
   AuthUser,
@@ -9,23 +10,99 @@ import {
   getAuthSession,
   saveAuthSession,
 } from "@/lib/auth";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  ArrowLeftIcon,
+  ChevronDownIcon,
+  CircleStackIcon,
+  HomeIcon,
+  ListIcon,
+  LogoutIcon,
+  PlusIcon,
+  XIcon,
+} from "@/components/ui/icons";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 type Mode = "login" | "register";
+type TransactionType = "buy" | "sell";
 
 type AuthResponse = {
   token: string;
   user: AuthUser;
 };
 
+type CryptoOption = {
+  name: string;
+  symbol: string;
+};
+
+type AddCryptoForm = {
+  assetQuery: string;
+  transactionDate: string;
+  quantity: string;
+  unitPriceBrl: string;
+  otherCostsBrl: string;
+};
+
+const TOP_CRYPTO_OPTIONS: CryptoOption[] = [
+  { name: "Bitcoin", symbol: "BTC" },
+  { name: "Ethereum", symbol: "ETH" },
+  { name: "Tether", symbol: "USDT" },
+  { name: "BNB", symbol: "BNB" },
+  { name: "XRP", symbol: "XRP" },
+  { name: "USDC", symbol: "USDC" },
+  { name: "Solana", symbol: "SOL" },
+  { name: "TRON", symbol: "TRX" },
+  { name: "Dogecoin", symbol: "DOGE" },
+  { name: "Cardano", symbol: "ADA" },
+];
+
+const initialAddCryptoForm: AddCryptoForm = {
+  assetQuery: "",
+  transactionDate: "",
+  quantity: "1",
+  unitPriceBrl: "",
+  otherCostsBrl: "0",
+};
+
+function getUserInitials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "CI";
+}
+
+function formatCurrencyBrl(value: number) {
+  return new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(value);
+}
+
+function Field({ children }: { children: React.ReactNode }) {
+  return <div className="space-y-2">{children}</div>;
+}
+
 export function AuthControls() {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [mode, setMode] = useState<Mode>("login");
   const [isOpen, setIsOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAddCryptoOpen, setIsAddCryptoOpen] = useState(false);
+  const [transactionType, setTransactionType] = useState<TransactionType>("buy");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addCryptoMessage, setAddCryptoMessage] = useState<string | null>(null);
+  const [addCryptoForm, setAddCryptoForm] = useState<AddCryptoForm>(initialAddCryptoForm);
+  const [isAssetAutocompleteOpen, setIsAssetAutocompleteOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const assetAutocompleteRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const sync = () => {
@@ -38,18 +115,88 @@ export function AuthControls() {
   }, []);
 
   useEffect(() => {
-    const pendingError = consumeAuthError();
+    const applyPendingAuthError = () => {
+      const pendingError = consumeAuthError();
 
-    if (!pendingError) {
-      return;
-    }
+      if (!pendingError) return;
 
-    setMode("login");
-    setError(pendingError);
-    setIsOpen(true);
+      setMode("login");
+      setError(pendingError.message);
+      setEmail(pendingError.email ?? "");
+      setPassword("");
+      setIsOpen(true);
+    };
+
+    applyPendingAuthError();
+    window.addEventListener("auth:error", applyPendingAuthError);
+
+    return () => window.removeEventListener("auth:error", applyPendingAuthError);
   }, []);
 
+  useEffect(() => {
+    setAddCryptoForm((current) =>
+      current.transactionDate
+        ? current
+        : { ...current, transactionDate: new Date().toISOString().slice(0, 10) },
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    function handleOutsideClick(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!isAssetAutocompleteOpen) return;
+
+    function handleOutsideClick(event: MouseEvent) {
+      if (!assetAutocompleteRef.current?.contains(event.target as Node)) {
+        setIsAssetAutocompleteOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, [isAssetAutocompleteOpen]);
+
   const title = useMemo(() => (mode === "login" ? "Entrar" : "Criar conta"), [mode]);
+
+  const filteredCryptoOptions = useMemo(() => {
+    const query = addCryptoForm.assetQuery.trim().toLowerCase();
+
+    if (!query) return TOP_CRYPTO_OPTIONS;
+
+    return TOP_CRYPTO_OPTIONS.filter((crypto) =>
+      `${crypto.name} ${crypto.symbol}`.toLowerCase().includes(query),
+    );
+  }, [addCryptoForm.assetQuery]);
+
+  const totalValuePreview = useMemo(() => {
+    const quantity = Number(addCryptoForm.quantity.replace(",", "."));
+    const unitPriceBrl = Number(addCryptoForm.unitPriceBrl.replace(",", "."));
+    const otherCostsBrl = Number(addCryptoForm.otherCostsBrl.replace(",", "."));
+
+    if (Number.isNaN(quantity) || Number.isNaN(unitPriceBrl) || Number.isNaN(otherCostsBrl)) {
+      return "R$ 0,00";
+    }
+
+    const gross = quantity * unitPriceBrl;
+    const total = transactionType === "buy" ? gross + otherCostsBrl : gross - otherCostsBrl;
+    return formatCurrencyBrl(Math.max(total, 0));
+  }, [
+    addCryptoForm.otherCostsBrl,
+    addCryptoForm.quantity,
+    addCryptoForm.unitPriceBrl,
+    transactionType,
+  ]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -85,151 +232,401 @@ export function AuthControls() {
     }
   }
 
+  function closeAuthModal() {
+    setIsOpen(false);
+    setError(null);
+    setEmail("");
+    setPassword("");
+    setName("");
+  }
+
   function logout() {
     clearAuthSession();
     setUser(null);
+    setIsMenuOpen(false);
   }
+
+  function openAddCryptoModal() {
+    setAddCryptoMessage(null);
+    setTransactionType("buy");
+    setAddCryptoForm((current) => ({
+      ...initialAddCryptoForm,
+      transactionDate: current.transactionDate || new Date().toISOString().slice(0, 10),
+    }));
+    setIsMenuOpen(false);
+    setIsAddCryptoOpen(true);
+  }
+
+  function handleAddCryptoSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setAddCryptoMessage(
+      "Modal pronto para integrar com a pagina de lancamentos. No proximo passo conectamos ao backend.",
+    );
+  }
+
+  function selectCryptoOption(option: CryptoOption) {
+    setAddCryptoForm((current) => ({
+      ...current,
+      assetQuery: `${option.name} (${option.symbol})`,
+    }));
+    setIsAssetAutocompleteOpen(false);
+  }
+
+  const transactionDateLabel = transactionType === "buy" ? "Data da compra" : "Data da venda";
+  const totalValueLabel =
+    transactionType === "buy" ? "Valor total da compra" : "Valor total da venda";
 
   return (
     <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
       {user ? (
-        <div className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2 text-sm">
-          <span className="max-w-32 truncate text-slate-200">Ola, {user.name}</span>
-          <button
-            className="rounded-md border border-slate-600 px-2 py-1 text-slate-300 hover:bg-slate-800"
-            onClick={logout}
-            type="button"
+        <div className="relative" ref={menuRef}>
+          <Button
+            className="gap-3 rounded-full border-cyan-500/40 bg-slate-950/85 px-3 py-2 shadow-lg shadow-cyan-950/20"
+            onClick={() => setIsMenuOpen((open) => !open)}
+            variant="outline"
           >
-            Sair
-          </button>
+            <Avatar>
+              {user.avatarUrl ? (
+                <AvatarImage alt={`Foto de ${user.name}`} src={user.avatarUrl} />
+              ) : (
+                <AvatarFallback>{getUserInitials(user.name)}</AvatarFallback>
+              )}
+            </Avatar>
+            <div className="hidden text-left sm:block">
+              <p className="max-w-40 truncate text-sm font-semibold text-cyan-400">{user.name}</p>
+              <p className="text-xs text-slate-400">Minha conta</p>
+            </div>
+            <ChevronDownIcon className="text-slate-400" />
+          </Button>
+
+          {isMenuOpen ? (
+            <div className="absolute right-0 mt-3 w-72 overflow-hidden rounded-3xl border border-slate-700 bg-slate-950/95 shadow-2xl shadow-cyan-950/20 backdrop-blur">
+              <div className="border-b border-slate-800 bg-[linear-gradient(135deg,rgba(34,211,238,0.18),rgba(15,23,42,0.05))] px-5 py-4">
+                <p className="truncate text-base font-semibold text-cyan-400">{user.name}</p>
+                <p className="mt-1 truncate text-sm text-slate-400">{user.email}</p>
+              </div>
+
+              <div className="p-2">
+                <Link
+                  className="flex items-center justify-between rounded-2xl px-4 py-3 text-slate-100 transition hover:bg-slate-900"
+                  href="/"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <span>Página inicial</span>
+                  <HomeIcon className="text-cyan-400" />
+                </Link>
+
+                <Link
+                  className="flex items-center justify-between rounded-2xl px-4 py-3 text-slate-100 transition hover:bg-slate-900"
+                  href="/minhas-criptos"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <span>Minhas criptos</span>
+                  <CircleStackIcon className="text-cyan-400" />
+                </Link>
+
+                <button
+                  className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-slate-100 transition hover:bg-slate-900"
+                  onClick={openAddCryptoModal}
+                  type="button"
+                >
+                  <span>Adicionar criptos</span>
+                  <PlusIcon className="text-cyan-400" />
+                </button>
+
+                <Link
+                  className="flex items-center justify-between rounded-2xl px-4 py-3 text-slate-100 transition hover:bg-slate-900"
+                  href="/lancamentos"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <span>Lançamentos</span>
+                  <ListIcon className="text-cyan-400" />
+                </Link>
+
+                <button
+                  className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-rose-200 transition hover:bg-rose-500/10"
+                  onClick={logout}
+                  type="button"
+                >
+                  <span>Sair</span>
+                  <LogoutIcon />
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="flex items-center gap-2">
-          <button
-            className="rounded-md border border-slate-600 px-3 py-1.5 text-sm text-slate-100 hover:bg-slate-800"
+          <Button
+            size="sm"
+            variant="outline"
             onClick={() => {
               setError(null);
+              setEmail("");
+              setPassword("");
+              setName("");
               setMode("register");
               setIsOpen(true);
             }}
-            type="button"
           >
             Cadastrar
-          </button>
-          <button
-            className="rounded-md bg-cyan-500 px-3 py-1.5 text-sm font-semibold text-slate-950 hover:bg-cyan-400"
+          </Button>
+          <Button
+            size="sm"
             onClick={() => {
               setError(null);
+              setEmail("");
+              setPassword("");
+              setName("");
               setMode("login");
               setIsOpen(true);
             }}
-            type="button"
           >
             Login
-          </button>
+          </Button>
         </div>
       )}
 
-      {isOpen ? (
-        <div className="fixed inset-0 z-30 flex items-center justify-center bg-slate-950/80 p-4">
-          <div className="w-full max-w-md rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-xl font-semibold text-slate-100">{title}</h3>
-              <button
-                className="text-slate-300 hover:text-white"
-                onClick={() => setIsOpen(false)}
-                type="button"
-              >
-                x
-              </button>
-            </div>
+      <Dialog open={isOpen}>
+        <DialogContent className="max-w-md rounded-xl p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-xl font-semibold text-slate-100">{title}</h3>
+            <Button onClick={closeAuthModal} size="icon" variant="ghost">
+              <XIcon />
+            </Button>
+          </div>
 
-            <form className="space-y-3" onSubmit={handleSubmit}>
-              {mode === "register" ? (
-                <input
-                  className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2"
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Nome"
-                  required
-                  value={name}
-                />
-              ) : null}
+          <form className="space-y-3" onSubmit={handleSubmit}>
+            {mode === "register" ? (
+              <Input onChange={(event) => setName(event.target.value)} placeholder="Nome" required value={name} />
+            ) : null}
 
-              <input
-                className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2"
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="Email"
-                required
-                type="email"
-                value={email}
-              />
+            <Input
+              onChange={(event) => setEmail(event.target.value)}
+              placeholder="Email"
+              required
+              type="email"
+              value={email}
+            />
 
-              <input
-                className="w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2"
-                minLength={6}
-                onChange={(event) => setPassword(event.target.value)}
-                placeholder="Senha"
-                required
-                type="password"
-                value={password}
-              />
+            <Input
+              minLength={6}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Senha"
+              required
+              type="password"
+              value={password}
+            />
 
-              {error ? <p className="text-sm text-rose-300">{error}</p> : null}
+            {error ? <p className="text-sm text-rose-300">{error}</p> : null}
 
-              <button
-                className="w-full rounded-md bg-cyan-500 py-2 font-semibold text-slate-950 transition hover:bg-cyan-400 disabled:cursor-wait disabled:opacity-70"
-                disabled={isSubmitting}
-                type="submit"
-              >
-                {isSubmitting ? (
-                  <span className="flex items-center justify-center gap-3">
-                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
-                    <span>Validando acesso...</span>
-                  </span>
-                ) : (
-                  title
-                )}
-              </button>
-
+            <Button className="w-full rounded-md" disabled={isSubmitting} type="submit">
               {isSubmitting ? (
-                <div className="space-y-2 rounded-md border border-cyan-500/20 bg-cyan-500/10 px-3 py-2">
-                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
-                    <div className="h-full w-1/3 animate-pulse rounded-full bg-cyan-400" />
-                  </div>
-                  <p className="text-center text-xs text-cyan-100">
-                    Estamos verificando suas credenciais com seguranca.
-                  </p>
+                <span className="flex items-center justify-center gap-3">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-950/30 border-t-slate-950" />
+                  <span>Validando acesso...</span>
+                </span>
+              ) : (
+                title
+              )}
+            </Button>
+
+            {isSubmitting ? (
+              <div className="space-y-2 rounded-md border border-cyan-500/20 bg-cyan-500/10 px-3 py-2">
+                <div className="h-1.5 overflow-hidden rounded-full bg-slate-800">
+                  <div className="h-full w-1/3 animate-pulse rounded-full bg-cyan-400" />
                 </div>
-              ) : null}
-            </form>
+                <p className="text-center text-xs text-cyan-100">
+                  Estamos verificando suas credenciais com seguranca.
+                </p>
+              </div>
+            ) : null}
+          </form>
 
-            <div className="my-4 h-px bg-slate-700" />
+          <Separator className="my-4" />
 
+          <Button
+            className="w-full rounded-md"
+            disabled={isSubmitting}
+            onClick={handleGoogleLogin}
+            type="button"
+            variant="outline"
+          >
+            Entrar com o Google
+          </Button>
+
+          <p className="mt-3 text-center text-sm text-slate-400">
+            {mode === "login" ? "Nao tem conta?" : "Ja tem conta?"}{" "}
             <button
-              className="w-full rounded-md border border-slate-600 py-2 text-slate-100 hover:bg-slate-800 disabled:opacity-60"
-              disabled={isSubmitting}
-              onClick={handleGoogleLogin}
+              className="text-cyan-300 hover:text-cyan-200"
+              onClick={() => {
+                setError(null);
+                setEmail("");
+                setPassword("");
+                setName("");
+                setMode(mode === "login" ? "register" : "login");
+              }}
               type="button"
             >
-              Entrar com o Google
+              {mode === "login" ? "Cadastre-se" : "Entrar"}
             </button>
+          </p>
+        </DialogContent>
+      </Dialog>
 
-            <p className="mt-3 text-center text-sm text-slate-400">
-              {mode === "login" ? "Nao tem conta?" : "Ja tem conta?"}{" "}
-              <button
-                className="text-cyan-300 hover:text-cyan-200"
-                onClick={() => {
-                  setError(null);
-                  setMode(mode === "login" ? "register" : "login");
-                }}
+      <Dialog open={isAddCryptoOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <div>
+              <DialogDescription>Carteira</DialogDescription>
+              <DialogTitle>Adicionar transacao</DialogTitle>
+            </div>
+            <Button onClick={() => setIsAddCryptoOpen(false)} size="icon" variant="outline">
+              <XIcon />
+            </Button>
+          </DialogHeader>
+
+          <form className="space-y-5" onSubmit={handleAddCryptoSubmit}>
+            <div className="grid grid-cols-2 rounded-full border border-slate-800 bg-slate-950 p-1">
+              <Button
+                className={cn(
+                  "rounded-full",
+                  transactionType === "buy" ? "bg-cyan-400 text-slate-950 hover:bg-cyan-300" : "bg-transparent text-slate-300 hover:bg-transparent hover:text-white",
+                )}
+                onClick={() => setTransactionType("buy")}
                 type="button"
               >
-                {mode === "login" ? "Cadastre-se" : "Entrar"}
-              </button>
-            </p>
-          </div>
-        </div>
-      ) : null}
+                COMPRA ↑
+              </Button>
+              <Button
+                className={cn(
+                  "rounded-full",
+                  transactionType === "sell" ? "bg-cyan-400 text-slate-950 hover:bg-cyan-300" : "bg-transparent text-slate-300 hover:bg-transparent hover:text-white",
+                )}
+                onClick={() => setTransactionType("sell")}
+                type="button"
+              >
+                VENDA ↓
+              </Button>
+            </div>
+
+            <Field>
+              <Label>Ativo</Label>
+              <div className="relative" ref={assetAutocompleteRef}>
+                <Input
+                  onChange={(event) => {
+                    setAddCryptoForm((current) => ({ ...current, assetQuery: event.target.value }));
+                    setIsAssetAutocompleteOpen(true);
+                  }}
+                  onFocus={() => setIsAssetAutocompleteOpen(true)}
+                  placeholder="Digite o nome da cripto"
+                  required
+                  value={addCryptoForm.assetQuery}
+                />
+                <ChevronDownIcon className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-500" />
+
+                {isAssetAutocompleteOpen ? (
+                  <div className="absolute left-0 right-0 top-[calc(100%+0.5rem)] z-10 max-h-64 overflow-y-auto rounded-2xl border border-slate-700 bg-slate-950/95 p-2 shadow-2xl shadow-black/40">
+                    {filteredCryptoOptions.length ? (
+                      filteredCryptoOptions.map((option) => (
+                        <button
+                          className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left transition hover:bg-slate-900"
+                          key={option.symbol}
+                          onClick={() => selectCryptoOption(option)}
+                          type="button"
+                        >
+                          <span className="text-slate-100">{option.name}</span>
+                          <span className="text-sm text-cyan-300">{option.symbol}</span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="rounded-xl px-3 py-3 text-sm text-slate-400">
+                        Nenhuma cripto encontrada nas top 10 atuais.
+                      </div>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+            </Field>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <Label>{transactionDateLabel}</Label>
+                <Input
+                  onChange={(event) =>
+                    setAddCryptoForm((current) => ({ ...current, transactionDate: event.target.value }))
+                  }
+                  required
+                  type="date"
+                  value={addCryptoForm.transactionDate}
+                />
+              </Field>
+
+              <Field>
+                <Label>Quantidade</Label>
+                <Input
+                  onChange={(event) =>
+                    setAddCryptoForm((current) => ({ ...current, quantity: event.target.value }))
+                  }
+                  placeholder="1"
+                  required
+                  step="any"
+                  type="number"
+                  value={addCryptoForm.quantity}
+                />
+              </Field>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <Label>Preco em R$</Label>
+                <Input
+                  onChange={(event) =>
+                    setAddCryptoForm((current) => ({ ...current, unitPriceBrl: event.target.value }))
+                  }
+                  placeholder="350000"
+                  required
+                  step="any"
+                  type="number"
+                  value={addCryptoForm.unitPriceBrl}
+                />
+              </Field>
+
+              <Field>
+                <Label>Outros custos</Label>
+                <Input
+                  onChange={(event) =>
+                    setAddCryptoForm((current) => ({ ...current, otherCostsBrl: event.target.value }))
+                  }
+                  placeholder="0"
+                  required
+                  step="any"
+                  type="number"
+                  value={addCryptoForm.otherCostsBrl}
+                />
+              </Field>
+            </div>
+
+            <div className="rounded-[1.75rem] border border-slate-700 bg-slate-950/80 px-5 py-4">
+              <p className="text-sm text-slate-400">{totalValueLabel}</p>
+              <p className="mt-1 text-3xl font-semibold text-cyan-300">{totalValuePreview}</p>
+            </div>
+
+            {addCryptoMessage ? (
+              <p className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+                {addCryptoMessage}
+              </p>
+            ) : null}
+
+            <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
+              <Button onClick={() => setIsAddCryptoOpen(false)} type="button" variant="outline">
+                Cancelar
+              </Button>
+              <Button type="submit">Salvar</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -239,7 +636,7 @@ export function AuthGoogleCallbackInfo() {
     <div className="flex min-h-screen items-center justify-center p-6 text-center text-slate-200">
       <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-6">
         <h1 className="text-2xl font-semibold">Conectando sua conta Google...</h1>
-        <p className="mt-2 text-slate-300">Se demorar muito, voce voltara para a tela inicial.</p>
+        <p className="mt-2 text-slate-300">Se demorar muito, você voltará para a tela inicial.</p>
       </div>
     </div>
   );

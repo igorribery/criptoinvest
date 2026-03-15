@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AuthGoogleCallbackInfo } from "@/components/auth-controls";
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { AuthUser, saveAuthError, saveAuthSession } from "@/lib/auth";
 
 type AuthResponse = {
@@ -35,7 +35,15 @@ export default function GoogleCallbackPage() {
       .catch((requestError) => {
         const message =
           requestError instanceof Error ? requestError.message : "Erro no login com Google.";
-        saveAuthError(message);
+        const email =
+          requestError instanceof ApiError &&
+          requestError.data &&
+          typeof requestError.data === "object" &&
+          "email" in requestError.data &&
+          typeof requestError.data.email === "string"
+            ? requestError.data.email
+            : undefined;
+        saveAuthError(message, email);
         setHasRedirectedOnError(true);
         router.replace("/");
       });

@@ -10,15 +10,17 @@ type DbUser = {
   name: string;
   email: string;
   password_hash: string | null;
+  google_id: string | null;
   created_at: string;
 };
 
-function sanitizeUser(user: DbUser) {
+function sanitizeUser(user: DbUser, extras?: { avatarUrl?: string }) {
   return {
     id: user.id,
     name: user.name,
     email: user.email,
     createdAt: user.created_at,
+    avatarUrl: extras?.avatarUrl,
   };
 }
 
@@ -32,27 +34,37 @@ authRouter.post("/register", async (req, res) => {
   };
 
   if (!name || !email || !password) {
-    return res.status(400).json({ message: "name, email e password são obrigatórios." });
+    return res.status(400).json({ message: "name, email e password sao obrigatorios." });
   }
 
   if (!isValidEmail(email)) {
-    return res.status(400).json({ message: "Email inválido." });
+    return res.status(400).json({ message: "Email invalido." });
   }
 
   if (password.length < 6) {
     return res.status(400).json({ message: "Senha deve ter ao menos 6 caracteres." });
   }
 
-  const existingUser = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+  const existingUser = await pool.query(
+    "SELECT id, name, email, password_hash, google_id, created_at FROM users WHERE email = $1",
+    [email],
+  );
+
   if (existingUser.rowCount) {
-    return res.status(409).json({ message: "Email já cadastrado." });
+    const user = existingUser.rows[0] as DbUser;
+    const message =
+      user.google_id && !user.password_hash
+        ? "Este email ja esta cadastrado pelo Google. Entre com o Google para continuar."
+        : "Email ja cadastrado.";
+
+    return res.status(409).json({ message });
   }
 
   const passwordHash = hashPassword(password);
   const created = await pool.query(
     `INSERT INTO users (name, email, password_hash)
      VALUES ($1, $2, $3)
-     RETURNING id, name, email, password_hash, created_at`,
+     RETURNING id, name, email, password_hash, google_id, created_at`,
     [name, email, passwordHash],
   );
 
@@ -66,22 +78,28 @@ authRouter.post("/login", async (req, res) => {
   const { email, password } = req.body as { email?: string; password?: string };
 
   if (!email || !password) {
-    return res.status(400).json({ message: "email e password são obrigatórios." });
+    return res.status(400).json({ message: "email e password sao obrigatorios." });
   }
 
   const result = await pool.query(
-    "SELECT id, name, email, password_hash, created_at FROM users WHERE email = $1",
+    "SELECT id, name, email, password_hash, google_id, created_at FROM users WHERE email = $1",
     [email],
   );
 
   if (!result.rowCount) {
-    return res.status(401).json({ message: "Credenciais inválidas." });
+    return res.status(401).json({ message: "Credenciais invalidas." });
   }
 
   const user = result.rows[0] as DbUser;
 
+  if (!user.password_hash && user.google_id) {
+    return res.status(403).json({
+      message: "Este email foi cadastrado pelo Google. Entre com o Google para continuar.",
+    });
+  }
+
   if (!user.password_hash || !verifyPassword(password, user.password_hash)) {
-    return res.status(401).json({ message: "Credenciais inválidas." });
+    return res.status(401).json({ message: "Credenciais invalidas." });
   }
 
   const token = signToken(user.id, user.email);
@@ -91,9 +109,7 @@ authRouter.post("/login", async (req, res) => {
 
 authRouter.get("/google/url", async (_req, res) => {
   if (!isGoogleAuthEnabled) {
-    return res
-      .status(503)
-      .json({ message: "Login com Google não está configurado no servidor." });
+    return res.status(503).json({ message: "Login com Google nao esta configurado no servidor." });
   }
 
   const state = randomBytes(16).toString("hex");
@@ -115,15 +131,13 @@ authRouter.get("/google/url", async (_req, res) => {
 
 authRouter.post("/google/exchange", async (req, res) => {
   if (!isGoogleAuthEnabled) {
-    return res
-      .status(503)
-      .json({ message: "Login com Google não está configurado no servidor." });
+    return res.status(503).json({ message: "Login com Google nao esta configurado no servidor." });
   }
 
   const { code } = req.body as { code?: string };
 
   if (!code) {
-    return res.status(400).json({ message: "Code do Google é obrigatório." });
+    return res.status(400).json({ message: "Code do Google e obrigatorio." });
   }
 
   const tokenResponse = await fetch("https://oauth2.googleapis.com/token", {
@@ -147,7 +161,7 @@ authRouter.post("/google/exchange", async (req, res) => {
 
   const tokenData = (await tokenResponse.json()) as { access_token?: string };
   if (!tokenData.access_token) {
-    return res.status(401).json({ message: "Google não retornou access token." });
+    return res.status(401).json({ message: "Google nao retornou access token." });
   }
 
   const profileResponse = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
@@ -165,14 +179,15 @@ authRouter.post("/google/exchange", async (req, res) => {
     name?: string;
     email?: string;
     email_verified?: boolean;
+    picture?: string;
   };
 
   if (!profile.sub || !profile.email || !profile.email_verified) {
-    return res.status(400).json({ message: "Conta Google sem e-mail verificado." });
+    return res.status(400).json({ message: "Conta Google sem email verificado." });
   }
 
   const existingByGoogle = await pool.query(
-    "SELECT id, name, email, password_hash, created_at FROM users WHERE google_id = $1",
+    "SELECT id, name, email, password_hash, google_id, created_at FROM users WHERE google_id = $1",
     [profile.sub],
   );
 
@@ -182,24 +197,27 @@ authRouter.post("/google/exchange", async (req, res) => {
     user = existingByGoogle.rows[0] as DbUser;
   } else {
     const existingByEmail = await pool.query(
-      "SELECT id, name, email, password_hash, created_at FROM users WHERE email = $1",
+      "SELECT id, name, email, password_hash, google_id, created_at FROM users WHERE email = $1",
       [profile.email],
     );
 
     if (existingByEmail.rowCount) {
-      const linked = await pool.query(
-        `UPDATE users
-         SET google_id = $1, name = COALESCE(NULLIF(name, ''), $2)
-         WHERE email = $3
-         RETURNING id, name, email, password_hash, created_at`,
-        [profile.sub, profile.name ?? profile.email.split("@")[0], profile.email],
-      );
-      user = linked.rows[0] as DbUser;
+      const existingUser = existingByEmail.rows[0] as DbUser;
+
+      if (!existingUser.google_id) {
+        return res.status(409).json({
+          message:
+            "Este email ja esta cadastrado com senha. Entre com email e senha para continuar.",
+          email: profile.email,
+        });
+      }
+
+      user = existingUser;
     } else {
       const created = await pool.query(
         `INSERT INTO users (name, email, google_id)
          VALUES ($1, $2, $3)
-         RETURNING id, name, email, password_hash, created_at`,
+         RETURNING id, name, email, password_hash, google_id, created_at`,
         [profile.name ?? profile.email.split("@")[0], profile.email, profile.sub],
       );
       user = created.rows[0] as DbUser;
@@ -207,5 +225,5 @@ authRouter.post("/google/exchange", async (req, res) => {
   }
 
   const token = signToken(user.id, user.email);
-  return res.json({ user: sanitizeUser(user), token });
+  return res.json({ user: sanitizeUser(user, { avatarUrl: profile.picture }), token });
 });
