@@ -520,9 +520,9 @@ export default function ConfiguracoesPage() {
               <CardContent className="p-6 sm:p-8">
                 <div className="mb-6">
                   <p className="text-xs uppercase tracking-[0.3em] text-cyan-300/80">E-mail</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-white">Trocar e-mail com confirmação</h2>
+                  <h2 className="mt-2 text-2xl font-semibold text-white">Alterar e-mail</h2>
                   <p className="mt-2 text-sm text-slate-400">
-                    Assim que você informar um novo e-mail, enviaremos um código para confirmar a troca.
+                    Assim que você informar um novo e-mail, enviaremos um código para confirmar a alteração.
                   </p>
                 </div>
 
@@ -546,7 +546,7 @@ export default function ConfiguracoesPage() {
                         type="submit"
                         variant="outline"
                       >
-                        {isSendingEmailCode ? "Enviando código..." : "Enviar código"}
+                        {isSendingEmailCode ? "Alterando e-mail..." : "Alterar e-mail"}
                       </Button>
                     </div>
                   </div>
