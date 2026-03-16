@@ -4,7 +4,6 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import {
-  AuthUser,
   clearAuthSession,
   consumeAuthError,
   getAuthSession,
@@ -30,6 +29,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { AuthUser } from "@/app/types/auth-types";
 
 type Mode = "login" | "register" | "forgotPassword";
 type RegisterStep = "form" | "verify";

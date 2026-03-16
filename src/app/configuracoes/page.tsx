@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ProtectedRoute } from "@/components/protected-route";
-import { ArrowLeftIcon, PencilIcon, SettingsIcon } from "@/components/ui/icons";
+import { ArrowLeftIcon, PencilIcon } from "@/components/ui/icons";
 import { api } from "@/lib/api";
 import { AuthUser, getAuthSession, updateAuthUser } from "@/lib/auth";
 import { cn } from "@/lib/utils";

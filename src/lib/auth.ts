@@ -1,23 +1,5 @@
-export type AuthUser = {
-  id: string;
-  name: string;
-  email: string;
-  createdAt: string;
-  avatarUrl?: string;
-};
+import { AUTH_ERROR_STORAGE_KEY, AUTH_STORAGE_KEY, AuthSession, AuthUser, PendingAuthError } from "@/app/types/auth-types";
 
-export type AuthSession = {
-  token: string;
-  user: AuthUser;
-};
-
-const AUTH_STORAGE_KEY = "criptoinvest.auth";
-const AUTH_ERROR_STORAGE_KEY = "criptoinvest.auth.error";
-
-type PendingAuthError = {
-  message: string;
-  email?: string;
-};
 
 export function saveAuthSession(session: AuthSession) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
@@ -77,3 +59,4 @@ export function consumeAuthError() {
     return { message: raw };
   }
 }
+
