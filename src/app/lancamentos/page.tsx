@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { ProtectedRoute } from "@/components/protected-route";
 import { ArrowLeftIcon } from "@/components/ui/icons";
+import { LancamentosTable } from "@/components/lancamentos-table";
+import { LancamentosHeaderActions } from "@/components/lancamentos-header-actions";
 
 export default function LancamentosPage() {
   return (
     <ProtectedRoute>
-      <main className="min-h-screen px-4 pb-14 pt-28 text-slate-100 sm:px-6 sm:pt-32">
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] px-4 pb-14 pt-28 text-slate-100 sm:px-6 sm:pt-32">
         <div className="mx-auto max-w-5xl">
           <Card className="p-8">
             <div className="flex items-center gap-3">
@@ -21,16 +23,14 @@ export default function LancamentosPage() {
 
             <h1 className="mt-4 text-4xl font-bold">Lançamentos</h1>
             <p className="mt-4 max-w-2xl text-slate-300">
-              Esta página vai listar compras e vendas registradas pelo usuário. O modal de adicionar
-              transação já ficou preparado para alimentar essa tela no próximo passo.
+              Aqui ficam todas as suas compras e vendas, com paginação e busca por ativo.
             </p>
 
-            <CardContent className="mt-8 rounded-2xl border border-dashed border-slate-700 bg-slate-950/40 p-8 text-center">
-              <p className="text-lg font-medium">Nenhum lançamento registrado ainda</p>
-              <p className="mt-2 text-slate-400">
-                Use o menu do perfil para abrir "Adicionar criptos" e criar a primeira compra ou venda.
-              </p>
-            </CardContent>
+            <div className="flex justify-end">
+              <LancamentosHeaderActions />
+            </div>
+
+            <LancamentosTable />
           </Card>
         </div>
       </main>

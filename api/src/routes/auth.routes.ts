@@ -288,7 +288,7 @@ authRouter.post("/profile/avatar", requireAuth, async (req, res) => {
     return res.status(400).json({ message: "Imagem obrigatoria." });
   }
 
-  const avatarUrl = await uploadAvatar(req.authUser!.id, imageDataUrl);
+  const avatarUrl = await uploadAvatar({ userId: req.authUser!.id, imageDataUrl });
   const updated = await pool.query(
     `UPDATE users
      SET avatar_url = $2

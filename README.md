@@ -148,8 +148,9 @@ criptoinvest/
   - `POST /auth/email-change/confirm`
 - mercado:
   - `GET /market/top-10`
+  - `GET /market/spot-prices?symbols=BTC,ETH` (cotação BRL via CoinGecko)
 - carteira:
-  - `POST /portfolio/entries`
+  - `POST /portfolio/entries` (body: `assetType`, `symbol`, `assetName`, `purchaseDate`, `side` `BUY`|`SELL`, `quantity`, `unitPriceBrl`, `otherCostsBrl`)
   - `GET /portfolio/entries`
   - `GET /portfolio/summary`
   - `DELETE /portfolio/entries/:id`
@@ -167,9 +168,11 @@ O schema atual em [api/sql/schema.sql] cria:
 - `pending_users`
 - `pending_email_changes`
 - `pending_password_resets`
-- `portfolio_entries`
+- `portfolio_entries` (com campo `side`: `BUY` ou `SELL`)
 - `price_alerts`
 - enums para tipo de ativo e direção do alerta
+
+**Banco já existente:** execute manualmente o SQL em [api/sql/migrations/002_portfolio_entry_side.sql](api/sql/migrations/002_portfolio_entry_side.sql) (adiciona a coluna `side` em `portfolio_entries`).
 
 Tipos de ativo aceitos hoje:
 

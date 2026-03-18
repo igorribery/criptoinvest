@@ -1,5 +1,7 @@
 import { AUTH_ERROR_STORAGE_KEY, AUTH_STORAGE_KEY, AuthSession, AuthUser, PendingAuthError } from "@/app/types/auth-types";
 
+export type { AuthSession, AuthUser, PendingAuthError };
+
 
 export function saveAuthSession(session: AuthSession) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));

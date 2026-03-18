@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import {
   clearAuthSession,
   consumeAuthError,
@@ -34,6 +34,16 @@ import { AuthUser } from "@/app/types/auth-types";
 type Mode = "login" | "register" | "forgotPassword";
 type RegisterStep = "form" | "verify";
 type TransactionType = "buy" | "sell";
+type PortfolioEditEntry = {
+  id: string;
+  side?: "BUY" | "SELL" | string;
+  symbol: string;
+  asset_name: string;
+  purchase_date: string;
+  quantity: string;
+  unit_price_brl: string;
+  other_costs_brl?: string;
+};
 
 type AuthResponse = {
   token: string;
@@ -84,6 +94,44 @@ const initialAddCryptoForm: AddCryptoForm = {
   otherCostsBrl: "0",
 };
 
+/** Resolve nome + símbolo a partir do texto do campo ou da lista top. */
+function resolveAssetFromQuery(query: string): { assetName: string; symbol: string } | null {
+  const trimmed = query.trim();
+  if (!trimmed) return null;
+
+  const paren = trimmed.match(/^(.+?)\s*\(([A-Za-z0-9]+)\)\s*$/);
+  if (paren) {
+    const name = paren[1].trim();
+    const sym = paren[2].toUpperCase();
+    if (name.length >= 1 && sym.length >= 2) return { assetName: name, symbol: sym };
+  }
+
+  const lower = trimmed.toLowerCase();
+  const exact = TOP_CRYPTO_OPTIONS.find(
+    (c) => c.name.toLowerCase() === lower || c.symbol.toLowerCase() === lower,
+  );
+  if (exact) return { assetName: exact.name, symbol: exact.symbol };
+
+  const partial = TOP_CRYPTO_OPTIONS.find(
+    (c) =>
+      c.name.toLowerCase().includes(lower) ||
+      (lower.length >= 2 && lower.includes(c.name.toLowerCase().slice(0, 4))),
+  );
+  if (partial) return { assetName: partial.name, symbol: partial.symbol };
+
+  const compact = trimmed.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  if (compact.length >= 2 && compact.length <= 12) {
+    return { assetName: trimmed, symbol: compact };
+  }
+  if (trimmed.length >= 2) {
+    return {
+      assetName: trimmed,
+      symbol: trimmed.slice(0, 10).toUpperCase().replace(/\s/g, "") || "ATIVO",
+    };
+  }
+  return null;
+}
+
 function getUserInitials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("") || "CI";
@@ -121,7 +169,10 @@ export function AuthControls() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addCryptoMessage, setAddCryptoMessage] = useState<string | null>(null);
+  const [addCryptoIsError, setAddCryptoIsError] = useState(false);
+  const [isSavingCrypto, setIsSavingCrypto] = useState(false);
   const [addCryptoForm, setAddCryptoForm] = useState<AddCryptoForm>(initialAddCryptoForm);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [isAssetAutocompleteOpen, setIsAssetAutocompleteOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const assetAutocompleteRef = useRef<HTMLDivElement | null>(null);
@@ -134,6 +185,43 @@ export function AuthControls() {
     sync();
     window.addEventListener("auth:changed", sync);
     return () => window.removeEventListener("auth:changed", sync);
+  }, []);
+
+  useEffect(() => {
+    function onEditEntry(event: Event) {
+      const custom = event as CustomEvent<PortfolioEditEntry>;
+      const entry = custom.detail;
+      if (!entry?.id) return;
+
+      setAddCryptoMessage(null);
+      setAddCryptoIsError(false);
+      setEditingEntryId(entry.id);
+
+      const side = entry.side === "SELL" ? "sell" : "buy";
+      setTransactionType(side);
+
+      setAddCryptoForm({
+        assetQuery: `${entry.asset_name} (${entry.symbol})`,
+        transactionDate: String(entry.purchase_date).slice(0, 10),
+        quantity: String(entry.quantity),
+        unitPriceBrl: String(entry.unit_price_brl),
+        otherCostsBrl: String((entry as any).other_costs_brl ?? "0"),
+      });
+
+      setIsAddCryptoOpen(true);
+    }
+
+    window.addEventListener("portfolio:edit-entry", onEditEntry as EventListener);
+    return () => window.removeEventListener("portfolio:edit-entry", onEditEntry as EventListener);
+  }, []);
+
+  useEffect(() => {
+    function onOpenAddEntry() {
+      openAddCryptoModal();
+    }
+
+    window.addEventListener("portfolio:add-entry", onOpenAddEntry);
+    return () => window.removeEventListener("portfolio:add-entry", onOpenAddEntry);
   }, []);
 
   useEffect(() => {
@@ -372,6 +460,8 @@ export function AuthControls() {
 
   function openAddCryptoModal() {
     setAddCryptoMessage(null);
+    setAddCryptoIsError(false);
+    setEditingEntryId(null);
     setTransactionType("buy");
     setAddCryptoForm((current) => ({
       ...initialAddCryptoForm,
@@ -381,11 +471,93 @@ export function AuthControls() {
     setIsAddCryptoOpen(true);
   }
 
-  function handleAddCryptoSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleAddCryptoSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setAddCryptoMessage(
-      "Modal pronto para integrar com a página de lançamentos. No próximo passo, conectamos ao backend.",
-    );
+    setAddCryptoMessage(null);
+    setAddCryptoIsError(false);
+
+    const session = getAuthSession();
+    if (!session?.token) {
+      setAddCryptoIsError(true);
+      setAddCryptoMessage("Faça login novamente para salvar a transação.");
+      return;
+    }
+
+    const resolved = resolveAssetFromQuery(addCryptoForm.assetQuery);
+    if (!resolved) {
+      setAddCryptoIsError(true);
+      setAddCryptoMessage("Selecione um ativo da lista ou digite nome e símbolo, ex.: Bitcoin (BTC).");
+      return;
+    }
+
+    const quantity = Number(String(addCryptoForm.quantity).replace(",", "."));
+    const unitPriceBrl = Number(String(addCryptoForm.unitPriceBrl).replace(",", "."));
+    const otherCostsBrl = Number(String(addCryptoForm.otherCostsBrl).replace(",", "."));
+
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      setAddCryptoIsError(true);
+      setAddCryptoMessage("Informe uma quantidade válida maior que zero.");
+      return;
+    }
+    if (!Number.isFinite(unitPriceBrl) || unitPriceBrl <= 0) {
+      setAddCryptoIsError(true);
+      setAddCryptoMessage("Informe um preço unitário em R$ válido.");
+      return;
+    }
+    if (!Number.isFinite(otherCostsBrl) || otherCostsBrl < 0) {
+      setAddCryptoIsError(true);
+      setAddCryptoMessage("Outros custos não podem ser negativos.");
+      return;
+    }
+
+    if (transactionType === "sell") {
+      const net = quantity * unitPriceBrl - otherCostsBrl;
+      if (net <= 0) {
+        setAddCryptoIsError(true);
+        setAddCryptoMessage(
+          "Na venda, o valor bruto (quantidade × preço) precisa ser maior que os custos.",
+        );
+        return;
+      }
+    }
+
+    setIsSavingCrypto(true);
+    try {
+      const path = editingEntryId ? `/portfolio/entries/${editingEntryId}` : "/portfolio/entries";
+      const request = editingEntryId ? api.patch : api.post;
+      await request(
+        path,
+        {
+          assetType: "CRYPTO",
+          symbol: resolved.symbol,
+          assetName: resolved.assetName,
+          purchaseDate: addCryptoForm.transactionDate,
+          side: transactionType === "buy" ? "BUY" : "SELL",
+          quantity,
+          unitPriceBrl,
+          otherCostsBrl,
+        },
+        { Authorization: `Bearer ${session.token}` },
+      );
+      setIsAddCryptoOpen(false);
+      setEditingEntryId(null);
+      setAddCryptoForm({
+        ...initialAddCryptoForm,
+        transactionDate: new Date().toISOString().slice(0, 10),
+      });
+      window.dispatchEvent(new Event("portfolio:changed"));
+    } catch (err) {
+      setAddCryptoIsError(true);
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Não foi possível salvar. Tente novamente.";
+      setAddCryptoMessage(msg);
+    } finally {
+      setIsSavingCrypto(false);
+    }
   }
 
   function selectCryptoOption(option: CryptoOption) {
@@ -805,24 +977,20 @@ export function AuthControls() {
           </DialogHeader>
 
           <form className="space-y-5" onSubmit={handleAddCryptoSubmit}>
-            <div className="grid grid-cols-2 rounded-full border border-slate-800 bg-slate-950 p-1">
+            <div className="grid grid-cols-2 gap-1 rounded-full border border-slate-800 bg-slate-950 p-1">
               <Button
-                className={cn(
-                  "rounded-full",
-                  transactionType === "buy" ? "bg-cyan-400 text-slate-950 hover:bg-cyan-300" : "bg-transparent text-slate-300 hover:bg-transparent hover:text-white",
-                )}
+                className="rounded-full"
                 onClick={() => setTransactionType("buy")}
                 type="button"
+                variant={transactionType === "buy" ? "default" : "outline"}
               >
                 COMPRA ↑
               </Button>
               <Button
-                className={cn(
-                  "rounded-full",
-                  transactionType === "sell" ? "bg-cyan-400 text-slate-950 hover:bg-cyan-300" : "bg-transparent text-slate-300 hover:bg-transparent hover:text-white",
-                )}
+                className="rounded-full"
                 onClick={() => setTransactionType("sell")}
                 type="button"
+                variant={transactionType === "sell" ? "default" : "outline"}
               >
                 VENDA ↓
               </Button>
@@ -931,16 +1099,30 @@ export function AuthControls() {
             </div>
 
             {addCryptoMessage ? (
-              <p className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-4 py-3 text-sm text-cyan-100">
+              <p
+                className={cn(
+                  "rounded-2xl border px-4 py-3 text-sm",
+                  addCryptoIsError
+                    ? "border-rose-500/30 bg-rose-500/10 text-rose-100"
+                    : "border-cyan-500/20 bg-cyan-500/10 text-cyan-100",
+                )}
+              >
                 {addCryptoMessage}
               </p>
             ) : null}
 
             <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
-              <Button onClick={() => setIsAddCryptoOpen(false)} type="button" variant="outline">
+              <Button
+                disabled={isSavingCrypto}
+                onClick={() => setIsAddCryptoOpen(false)}
+                type="button"
+                variant="outline"
+              >
                 Cancelar
               </Button>
-              <Button type="submit">Salvar</Button>
+              <Button disabled={isSavingCrypto} type="submit">
+                {isSavingCrypto ? "Salvando…" : "Salvar"}
+              </Button>
             </div>
           </form>
         </DialogContent>

@@ -41,6 +41,11 @@ export const api = {
       headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
     }),
+  delete: <T>(path: string, headers?: HeadersInit) =>
+    request<T>(path, {
+      method: "DELETE",
+      headers,
+    }),
 };
 
 export { API_URL };

@@ -3,6 +3,7 @@ export const revalidate = 60;
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Sparkline } from "@/components/sparkline";
+import { HomeNav } from "@/components/home-nav";
 import { getHomePrices } from "@/lib/coingecko";
 import { formatCurrencyBrl, formatPercentage } from "@/utils/format";
 
@@ -29,6 +30,8 @@ export default async function Home() {
       <h2 className="mx-auto mt-6 max-w-3xl text-center text-base text-slate-300 sm:text-lg">
         Top 10 preços das criptomoedas por capitalização de mercado
       </h2>
+
+      <HomeNav />
 
       <Card className="mt-10 rounded-xl bg-slate-900/50 p-3 sm:p-6">
         <div className="mb-4 flex items-center justify-between">

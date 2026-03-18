@@ -94,6 +94,7 @@ CREATE TABLE IF NOT EXISTS portfolio_entries (
   symbol TEXT NOT NULL,
   asset_name TEXT NOT NULL,
   purchase_date DATE NOT NULL,
+  side TEXT NOT NULL DEFAULT 'BUY' CHECK (side IN ('BUY', 'SELL')),
   quantity NUMERIC(20,8) NOT NULL CHECK (quantity > 0),
   unit_price_brl NUMERIC(20,2) NOT NULL CHECK (unit_price_brl > 0),
   other_costs_brl NUMERIC(20,2) NOT NULL DEFAULT 0 CHECK (other_costs_brl >= 0),

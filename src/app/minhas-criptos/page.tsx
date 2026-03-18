@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
+import { MinhasCriptosDashboard } from "@/components/minhas-criptos-dashboard";
 import { ProtectedRoute } from "@/components/protected-route";
 import { ArrowLeftIcon } from "@/components/ui/icons";
 
@@ -21,31 +22,11 @@ export default function MinhasCriptosPage() {
 
             <h1 className="mt-4 text-4xl font-bold">Minhas criptos</h1>
             <p className="mt-4 max-w-2xl text-slate-300">
-              Esta tela vai reunir os ativos cadastrados pelo usuário, com quantidade, preço médio e
-              evolução da carteira. Por enquanto, deixei a estrutura pronta para conectarmos os dados no próximo passo.
+              Veja posições (quantidade líquida e custo médio), valor contábil estimado e o histórico de
+              compras e vendas registradas na sua conta.
             </p>
 
-            <div className="mt-10 grid gap-4 md:grid-cols-3">
-              <Card className="rounded-2xl bg-slate-950/70 p-5">
-                <p className="text-sm text-slate-400">Ativos cadastrados</p>
-                <p className="mt-2 text-3xl font-semibold text-cyan-300">0</p>
-              </Card>
-              <Card className="rounded-2xl bg-slate-950/70 p-5">
-                <p className="text-sm text-slate-400">Valor total</p>
-                <p className="mt-2 text-3xl font-semibold text-slate-100">R$ 0,00</p>
-              </Card>
-              <Card className="rounded-2xl bg-slate-950/70 p-5">
-                <p className="text-sm text-slate-400">Status</p>
-                <p className="mt-2 text-3xl font-semibold text-amber-300">Em montagem</p>
-              </Card>
-            </div>
-
-            <CardContent className="mt-8 rounded-2xl border border-dashed border-slate-700 bg-slate-950/40 p-8 text-center">
-              <p className="text-lg font-medium">Nenhuma cripto cadastrada ainda</p>
-              <p className="mt-2 text-slate-400">
-                Use o menu do perfil para abrir o modal de "Adicionar criptos".
-              </p>
-            </CardContent>
+            <MinhasCriptosDashboard />
           </Card>
         </div>
       </main>
