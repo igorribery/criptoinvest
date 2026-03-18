@@ -20,18 +20,6 @@ export function HomeNav() {
     return () => window.removeEventListener("auth:changed", onAuthChanged);
   }, []);
 
-  useEffect(() => {
-    if (!loggedIn) {
-      document.body.style.paddingTop = "";
-      return;
-    }
-    document.body.style.paddingTop =
-      "calc(6.5rem + max(0px, env(safe-area-inset-top, 0px)))";
-    return () => {
-      document.body.style.paddingTop = "";
-    };
-  }, [loggedIn]);
-
   if (!loggedIn) {
     return null;
   }
@@ -39,9 +27,9 @@ export function HomeNav() {
   return (
     <nav
       aria-label="Navegação principal"
-      className="pointer-events-none fixed left-0 right-0 top-0 z-30 flex justify-center px-4 pt-[max(2rem,env(safe-area-inset-top,0px))]"
+      className="relative z-30 flex w-full justify-center border-b border-slate-800/80 bg-slate-950/90 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] backdrop-blur-md supports-[backdrop-filter]:bg-slate-950/75"
     >
-      <div className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-8 rounded-3xl p-2">
+      <div className="flex max-w-full flex-wrap items-center justify-center gap-3 sm:gap-6 md:gap-8">
       <Link href="/">
         <Button className="h-10 gap-2 rounded-full px-4" type="button" variant="outline">
           <HomeIcon className="text-cyan-300" />

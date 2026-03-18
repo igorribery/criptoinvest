@@ -8,7 +8,7 @@ import { LancamentosHeaderActions } from "@/components/lancamentos-header-action
 export default function LancamentosPage() {
   return (
     <ProtectedRoute>
-      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] px-4 pb-14 pt-28 text-slate-100 sm:px-6 sm:pt-32">
+      <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] px-4 pb-14 pt-8 text-slate-100 sm:px-6 sm:pt-10">
         <div className="mx-auto max-w-5xl">
           <Card className="p-8">
             <div className="flex items-center gap-3">

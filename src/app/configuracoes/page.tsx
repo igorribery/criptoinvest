@@ -327,7 +327,7 @@ export default function ConfiguracoesPage() {
   }
 
   const pageShell =
-    "min-h-screen w-full bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] px-4 pb-14 pt-28 text-slate-100 sm:px-6 sm:pt-32";
+    "min-h-screen w-full bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] px-4 pb-14 pt-8 text-slate-100 sm:px-6 sm:pt-10";
 
   if (!sessionReady || isLoading || !user) {
     return (
