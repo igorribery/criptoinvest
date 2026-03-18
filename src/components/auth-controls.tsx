@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, ApiError } from "@/lib/api";
+import { fetchFearGreedSnapshot } from "@/lib/fear-greed";
 import {
   clearAuthSession,
   consumeAuthError,
@@ -67,6 +69,46 @@ type CryptoOption = {
   name: string;
   symbol: string;
 };
+
+function fearGreedTone(classification: string | null | undefined) {
+  const normalized = (classification ?? "").trim().toLowerCase();
+
+  if (normalized.includes("extreme") && normalized.includes("fear")) {
+    return {
+      pill: "bg-rose-500/15 text-rose-200 border border-rose-500/30",
+      text: "text-rose-200",
+    };
+  }
+  if (normalized.includes("fear")) {
+    return {
+      pill: "bg-amber-500/15 text-amber-200 border border-amber-500/30",
+      text: "text-amber-200",
+    };
+  }
+  if (normalized.includes("neutral")) {
+    return {
+      pill: "bg-yellow-500/15 text-yellow-200 border border-yellow-500/30",
+      text: "text-yellow-200",
+    };
+  }
+  if (normalized.includes("extreme") && normalized.includes("greed")) {
+    return {
+      pill: "bg-emerald-500/15 text-emerald-200 border border-emerald-500/30",
+      text: "text-emerald-200",
+    };
+  }
+  if (normalized.includes("greed")) {
+    return {
+      pill: "bg-lime-500/15 text-lime-200 border border-lime-500/30",
+      text: "text-lime-200",
+    };
+  }
+
+  return {
+    pill: "bg-slate-500/15 text-slate-200 border border-slate-500/30",
+    text: "text-slate-200",
+  };
+}
 
 type AddCryptoForm = {
   assetQuery: string;
@@ -180,11 +222,12 @@ export function AuthControls() {
   const [isAssetAutocompleteOpen, setIsAssetAutocompleteOpen] = useState(false);
   const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
   const [notifDrawerAnimIn, setNotifDrawerAnimIn] = useState(false);
-  const [notifLoading, setNotifLoading] = useState(false);
-  const [notifError, setNotifError] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<Array<{ message: string; direction: "up" | "down" | "flat" }>>(
+  const [fearGreedLoading, setFearGreedLoading] = useState(false);
+  const [fearGreedError, setFearGreedError] = useState<string | null>(null);
+  const [fearGreedItems, setFearGreedItems] = useState<Array<{ label: string; value: string; classification: string }>>(
     [],
   );
+  const [fearGreedNextUpdateSeconds, setFearGreedNextUpdateSeconds] = useState<number | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const assetAutocompleteRef = useRef<HTMLDivElement | null>(null);
 
@@ -293,7 +336,12 @@ export function AuthControls() {
   }, [isNotifDrawerOpen]);
 
   useEffect(() => {
-    if (!user) setIsNotifDrawerOpen(false);
+    if (!user) {
+      setIsNotifDrawerOpen(false);
+      setFearGreedItems([]);
+      setFearGreedNextUpdateSeconds(null);
+      setFearGreedError(null);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -307,34 +355,56 @@ export function AuthControls() {
 
   useEffect(() => {
     if (!isNotifDrawerOpen) return;
-    if (notifications.length) return;
+    if (fearGreedItems.length) return;
 
     let cancelled = false;
-    setNotifLoading(true);
-    setNotifError(null);
+    setFearGreedLoading(true);
+    setFearGreedError(null);
 
-    api
-      .get<{
-        items: Array<{ message: string; direction: "up" | "down" | "flat" }>;
-        generatedAt: string;
-      }>("/market/daily-notifications")
-      .then((res) => {
+    fetchFearGreedSnapshot()
+      .then((snapshot) => {
         if (cancelled) return;
-        setNotifications(res.items ?? []);
+        setFearGreedItems(snapshot.historical);
+        setFearGreedNextUpdateSeconds(snapshot.nextUpdateSeconds);
       })
       .catch(() => {
         if (cancelled) return;
-        setNotifError("Não foi possível carregar as notificações agora.");
-        setNotifications([]);
+        setFearGreedError("Não foi possível carregar o Fear & Greed Index agora.");
+        setFearGreedItems([]);
+        setFearGreedNextUpdateSeconds(null);
       })
       .finally(() => {
-        if (!cancelled) setNotifLoading(false);
+        if (!cancelled) setFearGreedLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [isNotifDrawerOpen, notifications.length]);
+  }, [isNotifDrawerOpen, fearGreedItems.length]);
+
+  useEffect(() => {
+    if (!isNotifDrawerOpen) return;
+    if (fearGreedNextUpdateSeconds === null) return;
+
+    const id = window.setInterval(() => {
+      setFearGreedNextUpdateSeconds((current) => {
+        if (current === null) return null;
+        if (current <= 0) return 0;
+        return current - 1;
+      });
+    }, 1000);
+
+    return () => window.clearInterval(id);
+  }, [isNotifDrawerOpen, fearGreedNextUpdateSeconds]);
+
+  const fearGreedNextUpdateLabel = useMemo(() => {
+    if (fearGreedNextUpdateSeconds === null) return null;
+    const total = Math.max(0, Math.floor(fearGreedNextUpdateSeconds));
+    const hours = Math.floor(total / 3600);
+    const minutes = Math.floor((total % 3600) / 60);
+    const seconds = total % 60;
+    return `${hours} horas, ${minutes} minutos, ${seconds} segundos.`;
+  }, [fearGreedNextUpdateSeconds]);
 
   useEffect(() => {
     if (!isNotifDrawerOpen) return;
@@ -674,7 +744,7 @@ export function AuthControls() {
     hasStartedConfirmingPassword && password !== confirmPassword;
 
   return (
-    <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
+    <div className="relative z-40 shrink-0">
       {user ? (
         <>
         <div className="relative" ref={menuRef}>
@@ -755,14 +825,7 @@ export function AuthControls() {
                   onClick={openNotifDrawer}
                   type="button"
                 >
-                  <span className="flex items-center gap-2">
-                    Notificações
-                    {notifications.length ? (
-                      <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-200">
-                        {notifications.length}
-                      </span>
-                    ) : null}
-                  </span>
+                  <span className="flex items-center gap-2">Notificações</span>
                   <BellIcon className="text-cyan-400" />
                 </button>
 
@@ -779,64 +842,107 @@ export function AuthControls() {
           ) : null}
         </div>
 
-        {isNotifDrawerOpen ? (
-          <div className="fixed inset-0 z-[200] flex justify-end">
-            <button
-              aria-label="Fechar notificações"
-              className={cn(
-                "absolute inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300",
-                notifDrawerAnimIn ? "opacity-100" : "opacity-0",
-              )}
-              onClick={closeNotifDrawer}
-              type="button"
-            />
-            <aside
-              className={cn(
-                "relative z-10 flex h-full w-full max-w-md flex-col border-l border-slate-700 bg-[linear-gradient(180deg,rgba(15,23,42,0.99),rgba(2,6,23,0.99))] shadow-2xl shadow-cyan-950/30 transition-transform duration-300 ease-out",
-                notifDrawerAnimIn ? "translate-x-0" : "translate-x-full",
-              )}
-            >
-              <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-5 py-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-100">Notificações</h2>
-                  <p className="mt-0.5 text-xs text-slate-500">Variação nas últimas 24h • Top 10 (CoinGecko)</p>
-                </div>
-                <Button onClick={closeNotifDrawer} size="icon" type="button" variant="ghost">
-                  <XIcon />
-                </Button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
-                {notifLoading ? (
-                  <p className="text-sm text-slate-500">Carregando…</p>
-                ) : notifError ? (
-                  <p className="text-sm text-rose-300">{notifError}</p>
-                ) : notifications.length ? (
-                  <ul className="space-y-0 divide-y divide-slate-800/80">
-                    {notifications.map((n, idx) => (
-                      <li className="flex gap-3 py-4 text-sm text-slate-200 first:pt-0" key={`${idx}-${n.message.slice(0, 20)}`}>
-                        <span
-                          className={cn(
-                            "mt-0.5 shrink-0 tabular-nums",
-                            n.direction === "up"
-                              ? "text-emerald-400"
-                              : n.direction === "down"
-                                ? "text-rose-400"
-                                : "text-slate-400",
-                          )}
+        {isNotifDrawerOpen && typeof document !== "undefined"
+          ? createPortal(
+              <div className="fixed inset-0 z-[260] flex justify-end">
+                <button
+                  aria-label="Fechar notificações"
+                  className={cn(
+                    "absolute inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300",
+                    notifDrawerAnimIn ? "opacity-100" : "opacity-0",
+                  )}
+                  onClick={closeNotifDrawer}
+                  type="button"
+                />
+                <aside
+                  className={cn(
+                    "relative z-10 flex h-dvh max-h-dvh w-[min(100vw,420px)] shrink-0 flex-col overflow-hidden",
+                    "border-l border-slate-700/90 bg-[linear-gradient(180deg,rgba(15,23,42,0.99),rgba(2,6,23,0.99))]",
+                    "pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)]",
+                    "rounded-l-3xl shadow-[-16px_0_40px_rgba(0,0,0,0.5)] transition-transform duration-300 ease-out",
+                    notifDrawerAnimIn ? "translate-x-0" : "translate-x-full",
+                  )}
+                >
+                  <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-800/90 px-5 py-4">
+                    <div className="min-w-0">
+                      <h2 className="text-lg font-semibold text-slate-100">Notificações</h2>
+                      <div className="mt-1 space-y-1">
+                        {fearGreedLoading ? (
+                          <p className="text-xs text-cyan-400/90">Carregando próxima atualização…</p>
+                        ) : fearGreedNextUpdateLabel ? (
+                          <p className="text-xs text-cyan-400/90">
+                            A próxima atualização ocorrerá em {fearGreedNextUpdateLabel}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                    <Button
+                      className="shrink-0"
+                      onClick={closeNotifDrawer}
+                      size="icon"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <XIcon />
+                    </Button>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-4">
+                    <div className="mb-5 rounded-3xl border border-slate-800/80 bg-slate-950/60 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-100">Historical Values</p>
+                          <p className="mt-1 text-xs text-slate-400">Fear &amp; Greed Index</p>
+                        </div>
+                        <a
+                          className="shrink-0 rounded-full border border-slate-700/80 bg-slate-950/70 px-3 py-1 text-[11px] text-slate-300 transition hover:border-cyan-500/40 hover:text-cyan-200"
+                          href="https://alternative.me/crypto/fear-and-greed-index/"
+                          rel="noreferrer"
+                          target="_blank"
                         >
-                          {n.direction === "up" ? "▲" : n.direction === "down" ? "▼" : "•"}
-                        </span>
-                        <span className="leading-snug">{n.message}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-slate-500">Sem notificações por enquanto.</p>
-                )}
-              </div>
-            </aside>
-          </div>
-        ) : null}
+                          Fonte: Alternative.me
+                        </a>
+                      </div>
+
+                      {fearGreedError ? (
+                        <p className="mt-3 text-sm text-rose-300">{fearGreedError}</p>
+                      ) : fearGreedItems.length ? (
+                        <ul className="mt-4 space-y-3">
+                          {fearGreedItems.map((item) => (
+                            <li className="flex items-center justify-between gap-3" key={item.label}>
+                              <div className="min-w-0">
+                                <p className="text-xs text-slate-400">{item.label}</p>
+                                <p
+                                  className={cn(
+                                    "truncate text-sm font-medium",
+                                    fearGreedTone(item.classification).text,
+                                  )}
+                                >
+                                  {item.classification}
+                                </p>
+                              </div>
+                              <span
+                                className={cn(
+                                  "shrink-0 rounded-full px-3 py-1 text-sm font-semibold",
+                                  fearGreedTone(item.classification).pill,
+                                )}
+                              >
+                                {item.value}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : fearGreedLoading ? (
+                        <p className="mt-3 text-sm text-slate-500">Carregando Fear &amp; Greed Index…</p>
+                      ) : (
+                        <p className="mt-3 text-sm text-slate-500">Sem dados do Fear &amp; Greed Index por enquanto.</p>
+                      )}
+                    </div>
+                  </div>
+                </aside>
+              </div>,
+              document.body,
+            )
+          : null}
         </>
       ) : (
         <div className="flex items-center gap-2">
@@ -1198,7 +1304,9 @@ export function AuthControls() {
             </div>
 
             <Field>
-              <Label>Ativo</Label>
+              <Label>
+                Criptomoeda <span className="text-rose-500" aria-hidden="true">*</span>
+              </Label>
               <div className="relative" ref={assetAutocompleteRef}>
                 <Input
                   onChange={(event) => {
@@ -1206,7 +1314,7 @@ export function AuthControls() {
                     setIsAssetAutocompleteOpen(true);
                   }}
                   onFocus={() => setIsAssetAutocompleteOpen(true)}
-                  placeholder="Digite o nome da cripto"
+                  placeholder="Digite o nome da criptomoeda"
                   required
                   value={addCryptoForm.assetQuery}
                 />
@@ -1238,7 +1346,9 @@ export function AuthControls() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
-                <Label>{transactionDateLabel}</Label>
+                <Label>
+                  {transactionDateLabel} <span className="text-rose-500" aria-hidden="true">*</span>
+                </Label>
                 <Input
                   onChange={(event) =>
                     setAddCryptoForm((current) => ({ ...current, transactionDate: event.target.value }))
@@ -1250,11 +1360,27 @@ export function AuthControls() {
               </Field>
 
               <Field>
-                <Label>Quantidade</Label>
+                <Label>
+                  Quantidade <span className="text-rose-500" aria-hidden="true">*</span>
+                </Label>
                 <Input
-                  onChange={(event) =>
-                    setAddCryptoForm((current) => ({ ...current, quantity: event.target.value }))
-                  }
+                  min={0}
+                  onChange={(event) => {
+                    const v = event.target.value;
+                    if (v === "") {
+                      setAddCryptoForm((current) => ({ ...current, quantity: "" }));
+                      return;
+                    }
+                    const n = Number(String(v).replace(",", "."));
+                    if (Number.isFinite(n) && n >= 0) {
+                      setAddCryptoForm((current) => ({ ...current, quantity: v }));
+                    }
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "-" || event.key === "e" || event.key === "E" || event.key === "+") {
+                      event.preventDefault();
+                    }
+                  }}
                   placeholder="1"
                   required
                   step="any"
@@ -1266,7 +1392,9 @@ export function AuthControls() {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field>
-                <Label>Preço em R$</Label>
+                <Label>
+                  Preço em R$ <span className="text-rose-500" aria-hidden="true">*</span>
+                </Label>
                 <Input
                   onChange={(event) =>
                     setAddCryptoForm((current) => ({ ...current, unitPriceBrl: event.target.value }))
@@ -1286,7 +1414,6 @@ export function AuthControls() {
                     setAddCryptoForm((current) => ({ ...current, otherCostsBrl: event.target.value }))
                   }
                   placeholder="0"
-                  required
                   step="any"
                   type="number"
                   value={addCryptoForm.otherCostsBrl}
