@@ -14,6 +14,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
       if (!session) {
         setIsAuthorized(false);
+        window.dispatchEvent(new CustomEvent("auth:open", { detail: { mode: "login" } }));
         router.replace("/");
         return;
       }

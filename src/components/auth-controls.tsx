@@ -271,6 +271,10 @@ export function AuthControls() {
 
   useEffect(() => {
     function onOpenAddEntry() {
+      if (!getAuthSession()) {
+        window.dispatchEvent(new CustomEvent("auth:open", { detail: { mode: "login" } }));
+        return;
+      }
       openAddCryptoModal();
     }
 
@@ -303,6 +307,34 @@ export function AuthControls() {
     window.addEventListener("auth:error", applyPendingAuthError);
 
     return () => window.removeEventListener("auth:error", applyPendingAuthError);
+  }, []);
+
+  useEffect(() => {
+    function onAuthOpen(event: Event) {
+      const ce = event as CustomEvent<{ mode?: string }>;
+      const nextMode = ce.detail?.mode === "register" ? "register" : "login";
+      setError(null);
+      setForgotPasswordMessage(null);
+      setVerificationMessage(null);
+      setMode(nextMode);
+      setRegisterStep("form");
+      setPassword("");
+      setConfirmPassword("");
+      setForgotPasswordEmail("");
+      setVerificationCode("");
+      setVerificationEmail("");
+      setIsPasswordVisible(false);
+      if (nextMode === "login") {
+        setEmail(getRememberedLoginEmail() ?? "");
+      } else {
+        setName("");
+        setEmail("");
+      }
+      setIsOpen(true);
+    }
+
+    window.addEventListener("auth:open", onAuthOpen as EventListener);
+    return () => window.removeEventListener("auth:open", onAuthOpen as EventListener);
   }, []);
 
   useEffect(() => {
