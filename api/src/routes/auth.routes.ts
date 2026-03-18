@@ -91,7 +91,11 @@ authRouter.post("/register/start", async (req, res) => {
     [name.trim(), normalizedEmail, passwordHash, codeHash, expiresAt],
   );
 
-  await sendRegisterCodeEmail(normalizedEmail, name.trim(), code);
+  await sendRegisterCodeEmail({
+    email: normalizedEmail,
+    name: name.trim(),
+    code,
+  });
 
   return res.status(202).json({
     message: "Código de confirmação enviado para o seu e-mail.",
@@ -202,7 +206,11 @@ authRouter.post("/register/resend", async (req, res) => {
     [pendingUser.id, codeHash, expiresAt],
   );
 
-  await sendRegisterCodeEmail(normalizedEmail, pendingUser.name, code);
+  await sendRegisterCodeEmail({
+    email: normalizedEmail,
+    name: pendingUser.name ?? "",
+    code,
+  });
 
   return res.status(202).json({
     message: "Novo código enviado para o seu e-mail.",
@@ -343,7 +351,11 @@ authRouter.post("/password/forgot", async (req, res) => {
     [user.id, tokenHash, expiresAt],
   );
 
-  await sendPasswordResetEmail(normalizedEmail, user.name, resetLink);
+  await sendPasswordResetEmail({
+    email: normalizedEmail,
+    name: user.name ?? "",
+    resetLink,
+  });
 
   return res.json({
     message: "Enviamos as instruções de recuperação para o seu e-mail.",
@@ -454,7 +466,11 @@ authRouter.post("/email-change/start", requireAuth, async (req, res) => {
     [req.authUser!.id, normalizedEmail, codeHash, expiresAt],
   );
 
-  await sendRegisterCodeEmail(normalizedEmail, currentUser.name, code);
+  await sendRegisterCodeEmail({
+    email: normalizedEmail,
+    name: currentUser.name ?? "",
+    code,
+  });
 
   return res.status(202).json({
     message: "Código enviado para confirmar o novo e-mail.",
@@ -496,7 +512,11 @@ authRouter.post("/email-change/resend", requireAuth, async (req, res) => {
     [pendingChange.id, codeHash, expiresAt],
   );
 
-  await sendRegisterCodeEmail(pendingChange.new_email, currentUser.name, code);
+  await sendRegisterCodeEmail({
+    email: pendingChange.new_email,
+    name: currentUser.name ?? "",
+    code,
+  });
 
   return res.status(202).json({
     message: "Novo código enviado para o e-mail informado.",

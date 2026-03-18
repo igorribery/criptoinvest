@@ -10,7 +10,7 @@ export async function sendRegisterCodeEmail(input: sendRegisterCodeEmailType) {
   }
 
   const subject = "Seu código de confirmação - CriptoInvest";
-  const greetingName = input.name.trim() || "investidor";
+  const greetingName = (input.name ?? "").trim() || "investidor";
   const expiresInMinutes = env.registerCodeExpiresMinutes;
 
   const textBody = [
@@ -64,27 +64,27 @@ export async function sendRegisterCodeEmail(input: sendRegisterCodeEmailType) {
 
 export async function sendPasswordResetEmail(input: sendPasswordResetEmailType) {
   if (!isSesEnabled) {
-    throw new Error("AWS SES nÃ£o estÃ¡ configurado no servidor.");
+    throw new Error("AWS SES não está configurado no servidor.");
   }
 
-  const subject = "RecuperaÃ§Ã£o de senha - CriptoInvest";
-  const greetingName = input.name.trim() || "investidor";
+  const subject = "Recuperação de senha - CriptoInvest";
+  const greetingName = (input.name ?? "").trim() || "investidor";
   const expiresInMinutes = env.passwordResetExpiresMinutes;
 
   const textBody = [
-    `OlÃ¡, ${greetingName}!`,
+    `Olá, ${greetingName}!`,
     "",
     "Recebemos um pedido para redefinir sua senha no CriptoInvest.",
     `Use este link para criar uma nova senha: ${input.resetLink}`,
     "",
     `Esse link expira em ${expiresInMinutes} minutos.`,
-    "Se vocÃª nÃ£o solicitou a redefiniÃ§Ã£o, ignore este e-mail.",
+    "Se vocÃª nÃ£o solicitou a redefinição, ignore este e-mail.",
   ].join("\n");
 
   const htmlBody = `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #0f172a;">
       <h2 style="margin-bottom: 12px;">Recupere sua senha</h2>
-      <p>OlÃ¡, ${greetingName}!</p>
+      <p>Olá, ${greetingName}!</p>
       <p>Recebemos um pedido para redefinir sua senha no <strong>CriptoInvest</strong>.</p>
       <p style="margin: 24px 0;">
         <a
@@ -97,7 +97,7 @@ export async function sendPasswordResetEmail(input: sendPasswordResetEmailType) 
       <p>Se preferir, copie e cole este link no navegador:</p>
       <p style="word-break: break-all; color: #0f172a;">${input.resetLink}</p>
       <p>Esse link expira em ${expiresInMinutes} minutos.</p>
-      <p>Se vocÃª nÃ£o solicitou a redefiniÃ§Ã£o, ignore este e-mail.</p>
+      <p>Se vocÃª nÃ£o solicitou a redefinição, ignore este e-mail.</p>
     </div>
   `;
 
