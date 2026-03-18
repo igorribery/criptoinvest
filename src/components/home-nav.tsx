@@ -1,10 +1,29 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { getAuthSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { CircleStackIcon, HomeIcon, ListIcon, PlusIcon, SettingsIcon } from "@/components/ui/icons";
 
+function syncLoggedIn() {
+  return getAuthSession() !== null;
+}
+
 export function HomeNav() {
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    setLoggedIn(syncLoggedIn());
+    const onAuthChanged = () => setLoggedIn(syncLoggedIn());
+    window.addEventListener("auth:changed", onAuthChanged);
+    return () => window.removeEventListener("auth:changed", onAuthChanged);
+  }, []);
+
+  if (!loggedIn) {
+    return null;
+  }
+
   return (
     <div className="mt-8 flex flex-wrap items-center justify-center gap-8 rounded-3xl p-2">
       <Link href="/">
