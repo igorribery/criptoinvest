@@ -65,12 +65,18 @@ async function resolveCoinGeckoId(symbolUpper: string): Promise<string | null> {
   return null;
 }
 
+export type SpotPricesBrlResult = {
+  prices: Record<string, number | null>;
+  /** URL do ícone (CoinGecko), por símbolo em maiúsculas */
+  images: Record<string, string | null>;
+};
+
 /**
- * Preço spot em BRL por símbolo (ex.: BTC → bitcoin). Símbolos desconhecidos tentam busca CoinGecko.
+ * Preço spot em BRL + URL do ícone por símbolo (uma chamada /coins/markets).
  */
-export async function fetchSpotPricesBrl(symbols: string[]): Promise<Record<string, number | null>> {
+export async function fetchSpotPricesBrl(symbols: string[]): Promise<SpotPricesBrlResult> {
   const unique = [...new Set(symbols.map((s) => s.trim().toUpperCase()).filter(Boolean))];
-  if (!unique.length) return {};
+  if (!unique.length) return { prices: {}, images: {} };
 
   const symbolToId: Record<string, string> = {};
   for (const sym of unique) {
@@ -79,28 +85,46 @@ export async function fetchSpotPricesBrl(symbols: string[]): Promise<Record<stri
   }
 
   const ids = [...new Set(Object.values(symbolToId))];
+  const emptyPrices = Object.fromEntries(unique.map((s) => [s, null])) as Record<string, number | null>;
+  const emptyImages = Object.fromEntries(unique.map((s) => [s, null])) as Record<string, string | null>;
+
   if (!ids.length) {
-    return Object.fromEntries(unique.map((s) => [s, null]));
+    return { prices: emptyPrices, images: emptyImages };
   }
 
-  const url = new URL(`${env.coingeckoApiBaseUrl}/simple/price`);
+  const url = new URL(`${env.coingeckoApiBaseUrl}/coins/markets`);
+  url.searchParams.set("vs_currency", "brl");
   url.searchParams.set("ids", ids.join(","));
-  url.searchParams.set("vs_currencies", "brl");
-  url.searchParams.set("precision", "full");
+  url.searchParams.set("order", "market_cap_desc");
+  url.searchParams.set("per_page", "250");
+  url.searchParams.set("page", "1");
+  url.searchParams.set("sparkline", "false");
 
   const response = await fetch(url.toString(), { headers: { accept: "application/json" } });
   if (!response.ok) {
-    throw new Error(`CoinGecko simple/price: ${response.status}`);
+    throw new Error(`CoinGecko coins/markets: ${response.status}`);
   }
 
-  const payload = (await response.json()) as Record<string, { brl?: number }>;
-  const out: Record<string, number | null> = {};
+  const data = (await response.json()) as Array<{
+    id: string;
+    current_price: number | null;
+    image?: string;
+  }>;
+
+  const idToRow = new Map(data.map((row) => [row.id, row]));
+
+  const prices: Record<string, number | null> = {};
+  const images: Record<string, string | null> = {};
   for (const sym of unique) {
     const id = symbolToId[sym];
-    const brl = id ? payload[id]?.brl : undefined;
-    out[sym] = typeof brl === "number" && Number.isFinite(brl) ? brl : null;
+    const row = id ? idToRow.get(id) : undefined;
+    const p = row?.current_price;
+    prices[sym] = typeof p === "number" && Number.isFinite(p) ? p : null;
+    const img = row?.image?.trim();
+    images[sym] = img || null;
   }
-  return out;
+
+  return { prices, images };
 }
 
 export async function fetchTop10MarketData(vsCurrency = "brl") {

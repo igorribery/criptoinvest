@@ -34,6 +34,7 @@ type PortfolioEntry = {
 type SpotPricesResponse = {
   currency: string;
   prices: Record<string, number | null>;
+  images?: Record<string, string | null>;
 };
 
 function formatBrl(value: string | number) {
@@ -67,6 +68,7 @@ export function MinhasCriptosDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [spotPrices, setSpotPrices] = useState<Record<string, number | null>>({});
+  const [coinImages, setCoinImages] = useState<Record<string, string | null>>({});
   const [pricesLoading, setPricesLoading] = useState(false);
   const [pricesError, setPricesError] = useState<string | null>(null);
 
@@ -111,6 +113,7 @@ export function MinhasCriptosDashboard() {
   useEffect(() => {
     if (!assetSymbols) {
       setSpotPrices({});
+      setCoinImages({});
       setPricesError(null);
       return;
     }
@@ -122,11 +125,15 @@ export function MinhasCriptosDashboard() {
     api
       .get<SpotPricesResponse>(`/market/spot-prices?symbols=${encodeURIComponent(assetSymbols)}`)
       .then((res) => {
-        if (!cancelled) setSpotPrices(res.prices ?? {});
+        if (!cancelled) {
+          setSpotPrices(res.prices ?? {});
+          setCoinImages(res.images ?? {});
+        }
       })
       .catch(() => {
         if (!cancelled) {
           setSpotPrices({});
+          setCoinImages({});
           setPricesError("Cotações indisponíveis no momento.");
         }
       })
@@ -272,8 +279,32 @@ export function MinhasCriptosDashboard() {
                       key={`${a.symbol}-${a.asset_name}`}
                     >
                       <td className="px-4 py-4">
-                        <span className="font-semibold text-cyan-400">{a.symbol}</span>
-                        <span className="ml-2 text-slate-300">{a.asset_name}</span>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-600/60 bg-white p-0.5 shadow-sm">
+                            {coinImages[sym] ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={coinImages[sym]!}
+                                alt=""
+                                width={32}
+                                height={32}
+                                className="h-8 w-8 rounded-full object-cover"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <span
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold uppercase text-slate-600"
+                                aria-hidden
+                              >
+                                {sym.slice(0, 3)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-semibold text-cyan-400">{a.symbol}</span>
+                            <span className="ml-2 text-slate-300">{a.asset_name}</span>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-3 py-4 text-right tabular-nums text-slate-200">
                         {formatCryptoQty6(qty, a.total_quantity)}

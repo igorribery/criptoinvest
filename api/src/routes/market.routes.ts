@@ -17,8 +17,8 @@ marketRouter.get("/spot-prices", async (req, res) => {
   }
 
   try {
-    const prices = await fetchSpotPricesBrl(symbols);
-    return res.json({ currency: "brl", prices });
+    const { prices, images } = await fetchSpotPricesBrl(symbols);
+    return res.json({ currency: "brl", prices, images });
   } catch (error) {
     console.error(error);
     return res.status(502).json({ message: "Não foi possível buscar cotações agora." });
