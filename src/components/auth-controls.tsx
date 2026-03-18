@@ -7,7 +7,9 @@ import {
   clearAuthSession,
   consumeAuthError,
   getAuthSession,
+  getRememberedLoginEmail,
   saveAuthSession,
+  setRememberedLoginEmail,
 } from "@/lib/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -167,6 +169,7 @@ export function AuthControls() {
   const [verificationEmail, setVerificationEmail] = useState("");
   const [verificationMessage, setVerificationMessage] = useState<string | null>(null);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [rememberLoginEmail, setRememberLoginEmail] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addCryptoMessage, setAddCryptoMessage] = useState<string | null>(null);
@@ -418,6 +421,11 @@ export function AuthControls() {
       if (mode === "login") {
         const payload = await api.post<AuthResponse>("/auth/login", { email, password });
         saveAuthSession(payload);
+        if (rememberLoginEmail) {
+          setRememberedLoginEmail(email.trim());
+        } else {
+          setRememberedLoginEmail(null);
+        }
         setIsOpen(false);
         setPassword("");
         setConfirmPassword("");
@@ -858,7 +866,7 @@ export function AuthControls() {
             size="sm"
             onClick={() => {
               setError(null);
-              setEmail("");
+              setEmail(getRememberedLoginEmail() ?? "");
               setPassword("");
               setConfirmPassword("");
               setForgotPasswordEmail("");
@@ -869,6 +877,7 @@ export function AuthControls() {
               setName("");
               setRegisterStep("form");
               setIsPasswordVisible(false);
+              setRememberLoginEmail(true);
               setMode("login");
               setIsOpen(true);
             }}
@@ -900,6 +909,16 @@ export function AuthControls() {
             ) : null}
 
             <Input
+              autoComplete={
+                isForgotPasswordMode
+                  ? "email"
+                  : isVerifyStep
+                    ? "off"
+                    : mode === "login"
+                      ? "username"
+                      : "email"
+              }
+              name={isForgotPasswordMode ? "forgot-email" : isVerifyStep ? "verify-email" : mode === "login" ? "email" : "email"}
               onChange={(event) =>
                 isForgotPasswordMode ? setForgotPasswordEmail(event.target.value) : setEmail(event.target.value)
               }
@@ -949,12 +968,14 @@ export function AuthControls() {
               <>
                 <div className="relative">
                   <Input
+                    autoComplete={mode === "login" ? "current-password" : "new-password"}
                     className={cn(
                       "pr-12",
                       passwordsMatch ? "border-emerald-500 focus:border-emerald-400" : "",
                       passwordsDoNotMatch ? "border-rose-500 focus:border-rose-400" : "",
                     )}
                     minLength={6}
+                    name={mode === "login" ? "password" : "new-password"}
                     onChange={(event) => setPassword(event.target.value)}
                     placeholder="Senha"
                     required
@@ -1008,6 +1029,18 @@ export function AuthControls() {
                       </p>
                     ) : null}
                   </>
+                ) : null}
+
+                {mode === "login" ? (
+                  <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-400">
+                    <input
+                      checked={rememberLoginEmail}
+                      className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-cyan-500 focus:ring-cyan-500"
+                      onChange={(e) => setRememberLoginEmail(e.target.checked)}
+                      type="checkbox"
+                    />
+                    Lembrar meu e-mail
+                  </label>
                 ) : null}
               </>
             )}
@@ -1104,7 +1137,13 @@ export function AuthControls() {
                 className="text-cyan-300 hover:text-cyan-200"
                 onClick={() => {
                   setError(null);
-                  setEmail("");
+                  if (mode === "login") {
+                    setEmail("");
+                    setRememberLoginEmail(true);
+                  } else {
+                    setEmail(getRememberedLoginEmail() ?? "");
+                    setRememberLoginEmail(true);
+                  }
                   setPassword("");
                   setConfirmPassword("");
                   setForgotPasswordEmail("");

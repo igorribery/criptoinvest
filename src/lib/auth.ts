@@ -2,6 +2,25 @@ import { AUTH_ERROR_STORAGE_KEY, AUTH_STORAGE_KEY, AuthSession, AuthUser, Pendin
 
 export type { AuthSession, AuthUser, PendingAuthError };
 
+const REMEMBERED_LOGIN_EMAIL_KEY = "criptoinvest.rememberedEmail";
+
+/** E-mail salvo para preencher o login (opcional “lembrar”). Não armazene senha aqui. */
+export function getRememberedLoginEmail(): string | null {
+  if (typeof window === "undefined") return null;
+  const raw = localStorage.getItem(REMEMBERED_LOGIN_EMAIL_KEY);
+  const trimmed = raw?.trim();
+  return trimmed || null;
+}
+
+export function setRememberedLoginEmail(email: string | null) {
+  if (typeof window === "undefined") return;
+  if (email?.trim()) {
+    localStorage.setItem(REMEMBERED_LOGIN_EMAIL_KEY, email.trim());
+  } else {
+    localStorage.removeItem(REMEMBERED_LOGIN_EMAIL_KEY);
+  }
+}
+
 
 export function saveAuthSession(session: AuthSession) {
   localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(session));
