@@ -326,10 +326,13 @@ export default function ConfiguracoesPage() {
     }
   }
 
+  const pageShell =
+    "min-h-screen w-full bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.16),_transparent_30%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] px-4 pb-14 pt-28 text-slate-100 sm:px-6 sm:pt-32";
+
   if (!sessionReady || isLoading || !user) {
     return (
       <ProtectedRoute>
-        <main className="mx-auto flex min-h-screen w-full max-w-7xl items-center justify-center px-4 py-16 sm:px-6">
+        <main className={`flex items-center justify-center ${pageShell}`}>
           <div className="rounded-full border border-cyan-500/20 bg-slate-950/80 px-5 py-3 text-sm text-cyan-100">
             Carregando configurações da conta...
           </div>
@@ -340,7 +343,8 @@ export default function ConfiguracoesPage() {
 
   return (
     <ProtectedRoute>
-      <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-10 sm:px-6">
+      <main className={pageShell}>
+        <div className="mx-auto flex w-full max-w-7xl flex-col">
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
             <Button className="rounded-2xl" onClick={() => router.push("/")} size="icon" variant="outline">
@@ -601,6 +605,7 @@ export default function ConfiguracoesPage() {
               </CardContent>
             </Card>
           </div>
+        </div>
         </div>
       </main>
     </ProtectedRoute>

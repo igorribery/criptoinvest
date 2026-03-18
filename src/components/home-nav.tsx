@@ -20,12 +20,28 @@ export function HomeNav() {
     return () => window.removeEventListener("auth:changed", onAuthChanged);
   }, []);
 
+  useEffect(() => {
+    if (!loggedIn) {
+      document.body.style.paddingTop = "";
+      return;
+    }
+    document.body.style.paddingTop =
+      "calc(6.5rem + max(0px, env(safe-area-inset-top, 0px)))";
+    return () => {
+      document.body.style.paddingTop = "";
+    };
+  }, [loggedIn]);
+
   if (!loggedIn) {
     return null;
   }
 
   return (
-    <div className="mt-8 flex flex-wrap items-center justify-center gap-8 rounded-3xl p-2">
+    <nav
+      aria-label="Navegação principal"
+      className="pointer-events-none fixed left-0 right-0 top-0 z-30 flex justify-center px-4 pt-[max(2rem,env(safe-area-inset-top,0px))]"
+    >
+      <div className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-8 rounded-3xl p-2">
       <Link href="/">
         <Button className="h-10 gap-2 rounded-full px-4" type="button" variant="outline">
           <HomeIcon className="text-cyan-300" />
@@ -59,7 +75,8 @@ export function HomeNav() {
           Configurações
         </Button>
       </Link>
-    </div>
+      </div>
+    </nav>
   );
 }
 
