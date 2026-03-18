@@ -95,24 +95,34 @@ export function PortfolioAllocationChart({
               const pct = total > 0 ? (s.value / total) * 100 : 0;
               return (
                 <div className="flex items-center justify-between gap-3" key={`${s.label}-${idx}`}>
-                  <div className="flex items-center gap-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
                     <span
                       aria-hidden="true"
-                      className="h-2.5 w-2.5 rounded-full"
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
                       style={{ background: COLORS[idx % COLORS.length] }}
                     />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-slate-100">
-                        {s.symbol ? (
-                          <span className="text-cyan-400">{s.symbol}</span>
-                        ) : null}
-                        {s.symbol ? <span className="text-slate-500"> · </span> : null}
-                        {s.label}
-                      </p>
-                      <p className="text-xs text-slate-400">{formatPct(pct)}</p>
+                    <div
+                      className={
+                        s.symbol
+                          ? "grid min-w-0 flex-1 grid-cols-[3.5rem_1fr] items-baseline gap-x-2"
+                          : "min-w-0 flex-1"
+                      }
+                    >
+                      {s.symbol ? (
+                        <span className="truncate text-right text-sm font-medium tabular-nums text-cyan-400">
+                          {s.symbol}
+                        </span>
+                      ) : null}
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-slate-100">
+                          {s.symbol ? <span className="text-slate-500">· </span> : null}
+                          {s.label}
+                        </p>
+                        <p className="text-xs text-slate-400">{formatPct(pct)}</p>
+                      </div>
                     </div>
                   </div>
-                  <p className="text-sm font-semibold text-slate-200">{formatBrl(s.value)}</p>
+                  <p className="shrink-0 text-sm font-semibold text-slate-200">{formatBrl(s.value)}</p>
                 </div>
               );
             })}
