@@ -22,6 +22,7 @@ import {
   ListIcon,
   LogoutIcon,
   PlusIcon,
+  BellIcon,
   SettingsIcon,
   XIcon,
 } from "@/components/ui/icons";
@@ -174,6 +175,13 @@ export function AuthControls() {
   const [addCryptoForm, setAddCryptoForm] = useState<AddCryptoForm>(initialAddCryptoForm);
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [isAssetAutocompleteOpen, setIsAssetAutocompleteOpen] = useState(false);
+  const [isNotifDrawerOpen, setIsNotifDrawerOpen] = useState(false);
+  const [notifDrawerAnimIn, setNotifDrawerAnimIn] = useState(false);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const [notifError, setNotifError] = useState<string | null>(null);
+  const [notifications, setNotifications] = useState<Array<{ message: string; direction: "up" | "down" | "flat" }>>(
+    [],
+  );
   const menuRef = useRef<HTMLDivElement | null>(null);
   const assetAutocompleteRef = useRef<HTMLDivElement | null>(null);
 
@@ -271,6 +279,71 @@ export function AuthControls() {
     document.addEventListener("mousedown", handleOutsideClick);
     return () => document.removeEventListener("mousedown", handleOutsideClick);
   }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (!isNotifDrawerOpen) {
+      setNotifDrawerAnimIn(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => requestAnimationFrame(() => setNotifDrawerAnimIn(true)));
+    return () => cancelAnimationFrame(id);
+  }, [isNotifDrawerOpen]);
+
+  useEffect(() => {
+    if (!user) setIsNotifDrawerOpen(false);
+  }, [user]);
+
+  useEffect(() => {
+    if (!isNotifDrawerOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [isNotifDrawerOpen]);
+
+  useEffect(() => {
+    if (!isNotifDrawerOpen) return;
+    if (notifications.length) return;
+
+    let cancelled = false;
+    setNotifLoading(true);
+    setNotifError(null);
+
+    api
+      .get<{
+        items: Array<{ message: string; direction: "up" | "down" | "flat" }>;
+        generatedAt: string;
+      }>("/market/daily-notifications")
+      .then((res) => {
+        if (cancelled) return;
+        setNotifications(res.items ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setNotifError("Não foi possível carregar as notificações agora.");
+        setNotifications([]);
+      })
+      .finally(() => {
+        if (!cancelled) setNotifLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isNotifDrawerOpen, notifications.length]);
+
+  useEffect(() => {
+    if (!isNotifDrawerOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setNotifDrawerAnimIn(false);
+        window.setTimeout(() => setIsNotifDrawerOpen(false), 280);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isNotifDrawerOpen]);
 
   useEffect(() => {
     if (!isAssetAutocompleteOpen) return;
@@ -456,6 +529,18 @@ export function AuthControls() {
     clearAuthSession();
     setUser(null);
     setIsMenuOpen(false);
+    setIsNotifDrawerOpen(false);
+    setNotifDrawerAnimIn(false);
+  }
+
+  function openNotifDrawer() {
+    setIsMenuOpen(false);
+    setIsNotifDrawerOpen(true);
+  }
+
+  function closeNotifDrawer() {
+    setNotifDrawerAnimIn(false);
+    window.setTimeout(() => setIsNotifDrawerOpen(false), 280);
   }
 
   function openAddCryptoModal() {
@@ -583,6 +668,7 @@ export function AuthControls() {
   return (
     <div className="absolute right-4 top-4 z-20 sm:right-6 sm:top-6">
       {user ? (
+        <>
         <div className="relative" ref={menuRef}>
           <Button
             className="gap-3 rounded-full border-cyan-500/40 bg-slate-950/85 px-3 py-2 shadow-lg shadow-cyan-950/20"
@@ -657,6 +743,22 @@ export function AuthControls() {
                 </Link>
 
                 <button
+                  className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-slate-100 transition hover:bg-slate-900"
+                  onClick={openNotifDrawer}
+                  type="button"
+                >
+                  <span className="flex items-center gap-2">
+                    Notificações
+                    {notifications.length ? (
+                      <span className="rounded-full bg-cyan-500/20 px-2 py-0.5 text-xs text-cyan-200">
+                        {notifications.length}
+                      </span>
+                    ) : null}
+                  </span>
+                  <BellIcon className="text-cyan-400" />
+                </button>
+
+                <button
                   className="flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left text-rose-200 transition hover:bg-rose-500/10"
                   onClick={logout}
                   type="button"
@@ -668,6 +770,66 @@ export function AuthControls() {
             </div>
           ) : null}
         </div>
+
+        {isNotifDrawerOpen ? (
+          <div className="fixed inset-0 z-[200] flex justify-end">
+            <button
+              aria-label="Fechar notificações"
+              className={cn(
+                "absolute inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity duration-300",
+                notifDrawerAnimIn ? "opacity-100" : "opacity-0",
+              )}
+              onClick={closeNotifDrawer}
+              type="button"
+            />
+            <aside
+              className={cn(
+                "relative z-10 flex h-full w-full max-w-md flex-col border-l border-slate-700 bg-[linear-gradient(180deg,rgba(15,23,42,0.99),rgba(2,6,23,0.99))] shadow-2xl shadow-cyan-950/30 transition-transform duration-300 ease-out",
+                notifDrawerAnimIn ? "translate-x-0" : "translate-x-full",
+              )}
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-800 px-5 py-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-100">Notificações</h2>
+                  <p className="mt-0.5 text-xs text-slate-500">Variação nas últimas 24h • Top 10 (CoinGecko)</p>
+                </div>
+                <Button onClick={closeNotifDrawer} size="icon" type="button" variant="ghost">
+                  <XIcon />
+                </Button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                {notifLoading ? (
+                  <p className="text-sm text-slate-500">Carregando…</p>
+                ) : notifError ? (
+                  <p className="text-sm text-rose-300">{notifError}</p>
+                ) : notifications.length ? (
+                  <ul className="space-y-0 divide-y divide-slate-800/80">
+                    {notifications.map((n, idx) => (
+                      <li className="flex gap-3 py-4 text-sm text-slate-200 first:pt-0" key={`${idx}-${n.message.slice(0, 20)}`}>
+                        <span
+                          className={cn(
+                            "mt-0.5 shrink-0 tabular-nums",
+                            n.direction === "up"
+                              ? "text-emerald-400"
+                              : n.direction === "down"
+                                ? "text-rose-400"
+                                : "text-slate-400",
+                          )}
+                        >
+                          {n.direction === "up" ? "▲" : n.direction === "down" ? "▼" : "•"}
+                        </span>
+                        <span className="leading-snug">{n.message}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-slate-500">Sem notificações por enquanto.</p>
+                )}
+              </div>
+            </aside>
+          </div>
+        ) : null}
+        </>
       ) : (
         <div className="flex items-center gap-2">
           <Button

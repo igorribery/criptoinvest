@@ -1,21 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { CircleStackIcon, HomeIcon, ListIcon, LogoutIcon, PlusIcon, SettingsIcon } from "@/components/ui/icons";
-import { clearAuthSession, getAuthSession } from "@/lib/auth";
+import { CircleStackIcon, HomeIcon, ListIcon, PlusIcon, SettingsIcon } from "@/components/ui/icons";
 
 export function HomeNav() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  useEffect(() => {
-    const sync = () => setIsLoggedIn(Boolean(getAuthSession()?.token));
-    sync();
-    window.addEventListener("auth:changed", sync);
-    return () => window.removeEventListener("auth:changed", sync);
-  }, []);
-
   return (
     <div className="mt-8 flex flex-wrap items-center justify-center gap-8 rounded-3xl p-2">
       <Link href="/">
