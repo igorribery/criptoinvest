@@ -98,6 +98,9 @@ export function MinhasCriptosDashboard() {
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertsError, setAlertsError] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
+  const [alertsTotal, setAlertsTotal] = useState(0);
+  const [alertsPage, setAlertsPage] = useState(1);
+  const alertsPageSize = 5;
   const [activeTab, setActiveTab] = useState<"PERIODIC" | "TARGET_ONCE">("PERIODIC");
 
   const [formPeriodicHours, setFormPeriodicHours] = useState<4 | 12 | 24>(4);
@@ -112,6 +115,8 @@ export function MinhasCriptosDashboard() {
     setAlertsAssetName(assetName);
     setAlertsError(null);
     setAlerts([]);
+    setAlertsTotal(0);
+    setAlertsPage(1);
     setActiveTab("PERIODIC");
     setFormPeriodicHours(4);
     setFormTargetPrice("");
@@ -199,26 +204,38 @@ export function MinhasCriptosDashboard() {
     };
   }, [assetSymbols]);
 
-  const loadAlerts = useCallback(async (symbolUpper: string) => {
+  const loadAlerts = useCallback(async (symbolUpper: string, page: number) => {
     const session = getAuthSession();
     if (!session?.token) return;
     setAlertsLoading(true);
     setAlertsError(null);
     try {
       const headers = { Authorization: `Bearer ${session.token}` };
-      const payload = await api.get<{ items: AlertItem[] }>(`/alerts?symbol=${encodeURIComponent(symbolUpper)}`, headers);
+      const offset = (page - 1) * alertsPageSize;
+      const payload = await api.get<{ items: AlertItem[]; total?: number }>(
+        `/alerts?symbol=${encodeURIComponent(symbolUpper)}&limit=${alertsPageSize}&offset=${offset}`,
+        headers,
+      );
+
+      const total = typeof payload.total === "number" && Number.isFinite(payload.total) ? payload.total : 0;
       setAlerts(payload.items ?? []);
+      setAlertsTotal(total);
+
+      const maxPage = Math.max(1, Math.ceil(total / alertsPageSize));
+      if (page > maxPage) {
+        setAlertsPage(maxPage);
+      }
     } catch (e) {
       setAlertsError(e instanceof ApiError ? e.message : "Não foi possível carregar alertas.");
     } finally {
       setAlertsLoading(false);
     }
-  }, []);
+  }, [alertsPageSize]);
 
   useEffect(() => {
     if (!alertsOpen || !alertsSymbol) return;
-    loadAlerts(alertsSymbol);
-  }, [alertsOpen, alertsSymbol, loadAlerts]);
+    loadAlerts(alertsSymbol, alertsPage);
+  }, [alertsOpen, alertsSymbol, alertsPage, loadAlerts]);
 
   const canSubmitSms = !formNotifySms || formSmsPhone.trim().length > 0;
   const canSubmit = formNotifyEmail || formNotifySms;
@@ -265,7 +282,8 @@ export function MinhasCriptosDashboard() {
             };
 
       await api.post<{ alert: AlertItem }>("/alerts", body, headers);
-      await loadAlerts(alertsSymbol);
+      setAlertsPage(1);
+      await loadAlerts(alertsSymbol, 1);
       setFormTargetPrice("");
     } catch (e) {
       setAlertsError(e instanceof ApiError ? e.message : "Não foi possível criar o alerta.");
@@ -280,7 +298,7 @@ export function MinhasCriptosDashboard() {
     try {
       const headers = { Authorization: `Bearer ${session.token}` };
       await api.patch<{ alert: AlertItem }>(`/alerts/${id}`, { isActive }, headers);
-      if (alertsSymbol) await loadAlerts(alertsSymbol);
+      if (alertsSymbol) await loadAlerts(alertsSymbol, alertsPage);
     } catch (e) {
       setAlertsError(e instanceof ApiError ? e.message : "Não foi possível atualizar o alerta.");
     }
@@ -292,7 +310,7 @@ export function MinhasCriptosDashboard() {
     try {
       const headers = { Authorization: `Bearer ${session.token}` };
       await api.delete(`/alerts/${id}`, headers);
-      if (alertsSymbol) await loadAlerts(alertsSymbol);
+      if (alertsSymbol) await loadAlerts(alertsSymbol, alertsPage);
     } catch (e) {
       setAlertsError(e instanceof ApiError ? e.message : "Não foi possível excluir o alerta.");
     }
@@ -675,11 +693,15 @@ export function MinhasCriptosDashboard() {
                         <div className="min-w-0">
                           <p className="font-medium text-slate-100">{title}</p>
                           <p className="mt-1 text-sm text-slate-400">
-                            {channels || "—"} · {it.is_active ? "Ativo" : "Inativo"}
+                            {channels || "—"} ·{" "}
+                            <span className={it.is_active ? "font-medium text-emerald-400" : "font-medium text-rose-400"}>
+                              {it.is_active ? "Ativo" : "Inativo"}
+                            </span>
                           </p>
                         </div>
                         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center">
                           <Button
+                            className="min-w-[96px] justify-center"
                             onClick={() => handleDeleteAlert(it.id)}
                             size="sm"
                             type="button"
@@ -688,6 +710,7 @@ export function MinhasCriptosDashboard() {
                             Excluir
                           </Button>
                           <Button
+                            className="min-w-[96px] justify-center"
                             onClick={() => handleToggleAlert(it.id, !it.is_active)}
                             size="sm"
                             type="button"
@@ -705,6 +728,40 @@ export function MinhasCriptosDashboard() {
                   Nenhum alerta criado para este ativo.
                 </div>
               )}
+
+              {alertsTotal > alertsPageSize ? (
+                <div className="flex flex-col gap-2 rounded-2xl border border-slate-800 bg-slate-950/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-slate-400">
+                    Mostrando{" "}
+                    <span className="text-slate-200">
+                      {(alertsPage - 1) * alertsPageSize + 1}–{Math.min(alertsPage * alertsPageSize, alertsTotal)}
+                    </span>{" "}
+                    de <span className="text-slate-200">{alertsTotal}</span>
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      disabled={alertsPage <= 1 || alertsLoading}
+                      onClick={() => setAlertsPage((p) => Math.max(1, p - 1))}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      Anterior
+                    </Button>
+                    <Button
+                      disabled={alertsPage >= Math.ceil(alertsTotal / alertsPageSize) || alertsLoading}
+                      onClick={() =>
+                        setAlertsPage((p) => Math.min(Math.ceil(alertsTotal / alertsPageSize), p + 1))
+                      }
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      Próxima
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </DialogContent>

@@ -17,6 +17,7 @@ alertsRouter.post("/", async (req, res) => {
   const notifyEmail = typeof (body as any)?.notifyEmail === "boolean" ? (body as any).notifyEmail : true;
   const notifySms = typeof (body as any)?.notifySms === "boolean" ? (body as any).notifySms : false;
   const smsPhoneNumber = (body as any)?.smsPhoneNumber as string | undefined;
+  const smsNormalized = notifySms ? smsPhoneNumber?.trim() ?? null : null;
 
   if (!alertType || !ALLOWED_ALERT_TYPE.includes(alertType as (typeof ALLOWED_ALERT_TYPE)[number])) {
     return res.status(400).json({ message: `alertType inválido. Use ${ALLOWED_ALERT_TYPE.join(" ou ")}.` });
@@ -40,12 +41,29 @@ alertsRouter.post("/", async (req, res) => {
       return res.status(400).json({ message: `periodHours inválido. Use ${ALLOWED_PERIOD_HOURS.join(", ")}.` });
     }
 
+    const dup = await pool.query(
+      `SELECT id
+       FROM price_alerts
+       WHERE user_id = $1
+         AND symbol = $2
+         AND alert_type = 'PERIODIC'
+         AND period_hours = $3
+         AND notify_email = $4
+         AND notify_sms = $5
+         AND COALESCE(sms_phone_number, '') = COALESCE($6, '')
+       LIMIT 1`,
+      [req.authUser!.id, symbol.toUpperCase(), periodHours, notifyEmail, notifySms, smsNormalized],
+    );
+    if (dup.rowCount) {
+      return res.status(409).json({ message: "Você já tem um alerta idêntico para esse ativo." });
+    }
+
     const created = await pool.query(
       `INSERT INTO price_alerts
         (user_id, symbol, alert_type, period_hours, notify_email, notify_sms, sms_phone_number)
        VALUES ($1,$2,'PERIODIC',$3,$4,$5,$6)
        RETURNING *`,
-      [req.authUser!.id, symbol.toUpperCase(), periodHours, notifyEmail, notifySms, smsPhoneNumber?.trim() ?? null],
+      [req.authUser!.id, symbol.toUpperCase(), periodHours, notifyEmail, notifySms, smsNormalized],
     );
 
     return res.status(201).json({ alert: created.rows[0] });
@@ -81,12 +99,38 @@ alertsRouter.post("/", async (req, res) => {
     });
   }
 
+  const dup = await pool.query(
+    `SELECT id
+     FROM price_alerts
+     WHERE user_id = $1
+       AND symbol = $2
+       AND alert_type = 'TARGET_ONCE'
+       AND direction = $3
+       AND target_price_brl = $4
+       AND notify_email = $5
+       AND notify_sms = $6
+       AND COALESCE(sms_phone_number, '') = COALESCE($7, '')
+     LIMIT 1`,
+    [
+      req.authUser!.id,
+      symbol.toUpperCase(),
+      direction,
+      targetPriceBrl,
+      notifyEmail,
+      notifySms,
+      smsNormalized,
+    ],
+  );
+  if (dup.rowCount) {
+    return res.status(409).json({ message: "Você já tem um alerta idêntico para esse ativo." });
+  }
+
   const created = await pool.query(
     `INSERT INTO price_alerts
       (user_id, symbol, alert_type, direction, target_price_brl, notify_email, notify_sms, sms_phone_number)
      VALUES ($1,$2,'TARGET_ONCE',$3,$4,$5,$6,$7)
      RETURNING *`,
-    [req.authUser!.id, symbol.toUpperCase(), direction, targetPriceBrl, notifyEmail, notifySms, smsPhoneNumber?.trim() ?? null],
+    [req.authUser!.id, symbol.toUpperCase(), direction, targetPriceBrl, notifyEmail, notifySms, smsNormalized],
   );
 
   return res.status(201).json({ alert: created.rows[0] });
@@ -94,14 +138,26 @@ alertsRouter.post("/", async (req, res) => {
 
 alertsRouter.get("/", async (req, res) => {
   const symbol = String(req.query.symbol ?? "").trim().toUpperCase();
-  const items = await pool.query(
-    symbol
-      ? "SELECT * FROM price_alerts WHERE user_id = $1 AND symbol = $2 ORDER BY created_at DESC"
-      : "SELECT * FROM price_alerts WHERE user_id = $1 ORDER BY created_at DESC",
-    symbol ? [req.authUser!.id, symbol] : [req.authUser!.id],
-  );
+  const limitRaw = Number(req.query.limit ?? 20);
+  const offsetRaw = Number(req.query.offset ?? 0);
+  const limit = Number.isFinite(limitRaw) ? Math.max(1, Math.min(50, Math.trunc(limitRaw))) : 20;
+  const offset = Number.isFinite(offsetRaw) ? Math.max(0, Math.trunc(offsetRaw)) : 0;
 
-  return res.json({ items: items.rows });
+  const whereSql = symbol ? "user_id = $1 AND symbol = $2" : "user_id = $1";
+  const whereParams = symbol ? [req.authUser!.id, symbol] : [req.authUser!.id];
+
+  const [items, total] = await Promise.all([
+    pool.query(
+      `SELECT * FROM price_alerts
+       WHERE ${whereSql}
+       ORDER BY created_at DESC
+       LIMIT $${whereParams.length + 1} OFFSET $${whereParams.length + 2}`,
+      [...whereParams, limit, offset],
+    ),
+    pool.query(`SELECT COUNT(*)::int AS total FROM price_alerts WHERE ${whereSql}`, whereParams),
+  ]);
+
+  return res.json({ items: items.rows, total: total.rows[0]?.total ?? 0, limit, offset });
 });
 
 alertsRouter.patch("/:id", async (req, res) => {

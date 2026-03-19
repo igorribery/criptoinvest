@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getAuthSession } from "@/lib/auth";
 import { openAuthModal } from "@/lib/auth-modal";
@@ -12,8 +13,21 @@ function syncLoggedIn() {
   return getAuthSession() !== null;
 }
 
+function normalizePath(path: string) {
+  if (!path) return "/";
+  return path.length > 1 ? path.replace(/\/+$/, "") : path;
+}
+
+function isActivePath(current: string, href: string) {
+  const cur = normalizePath(current);
+  const target = normalizePath(href);
+  if (target === "/") return cur === "/";
+  return cur === target || cur.startsWith(`${target}/`);
+}
+
 export function HomeNav() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     setLoggedIn(syncLoggedIn());
@@ -21,6 +35,8 @@ export function HomeNav() {
     window.addEventListener("auth:changed", onAuthChanged);
     return () => window.removeEventListener("auth:changed", onAuthChanged);
   }, []);
+
+  const activeBtnClass = "border-cyan-400/50 bg-cyan-500/15 text-slate-50";
 
   return (
     <nav
@@ -30,7 +46,12 @@ export function HomeNav() {
       <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-center gap-3 sm:justify-between sm:gap-4">
         <div className="flex max-w-full flex-wrap items-center justify-center gap-2 sm:gap-3 md:gap-4">
           <Link href="/">
-            <Button className="h-10 gap-2 rounded-full px-4" type="button" variant="outline">
+            <Button
+              aria-current={isActivePath(pathname ?? "/", "/") ? "page" : undefined}
+              className={`h-10 gap-2 rounded-full px-4 ${isActivePath(pathname ?? "/", "/") ? activeBtnClass : ""}`}
+              type="button"
+              variant="outline"
+            >
               <HomeIcon className="text-cyan-300" />
               Resumo
             </Button>
@@ -38,7 +59,14 @@ export function HomeNav() {
 
           {loggedIn ? (
             <Link href="/minhas-criptos">
-              <Button className="h-10 gap-2 rounded-full px-4" type="button" variant="outline">
+              <Button
+                aria-current={isActivePath(pathname ?? "/", "/minhas-criptos") ? "page" : undefined}
+                className={`h-10 gap-2 rounded-full px-4 ${
+                  isActivePath(pathname ?? "/", "/minhas-criptos") ? activeBtnClass : ""
+                }`}
+                type="button"
+                variant="outline"
+              >
                 <CircleStackIcon className="text-cyan-300" />
                 Minhas criptos
               </Button>
@@ -73,7 +101,14 @@ export function HomeNav() {
 
           {loggedIn ? (
             <Link href="/lancamentos">
-              <Button className="h-10 gap-2 rounded-full px-4" type="button" variant="outline">
+              <Button
+                aria-current={isActivePath(pathname ?? "/", "/lancamentos") ? "page" : undefined}
+                className={`h-10 gap-2 rounded-full px-4 ${
+                  isActivePath(pathname ?? "/", "/lancamentos") ? activeBtnClass : ""
+                }`}
+                type="button"
+                variant="outline"
+              >
                 <ListIcon className="text-cyan-300" />
                 Lançamentos
               </Button>
@@ -92,7 +127,14 @@ export function HomeNav() {
 
           {loggedIn ? (
             <Link href="/configuracoes">
-              <Button className="h-10 gap-2 rounded-full px-4" type="button" variant="outline">
+              <Button
+                aria-current={isActivePath(pathname ?? "/", "/configuracoes") ? "page" : undefined}
+                className={`h-10 gap-2 rounded-full px-4 ${
+                  isActivePath(pathname ?? "/", "/configuracoes") ? activeBtnClass : ""
+                }`}
+                type="button"
+                variant="outline"
+              >
                 <SettingsIcon className="text-cyan-300" />
                 Configurações
               </Button>
