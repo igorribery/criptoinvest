@@ -193,12 +193,24 @@ async function sendEmail(to: string, subject: string, textBody: string, htmlBody
 
 async function sendSmsE164(phoneNumber: string, message: string) {
   if ((env.SMS_ENABLED ?? "false").toLowerCase() !== "true") return;
-  await sns.send(
-    new PublishCommand({
-      PhoneNumber: phoneNumber,
-      Message: message,
-    }),
-  );
+  try {
+    const res = await sns.send(
+      new PublishCommand({
+        PhoneNumber: phoneNumber,
+        Message: message,
+        MessageAttributes: {
+          "AWS.SNS.SMS.SMSType": {
+            DataType: "String",
+            StringValue: "Transactional",
+          },
+        },
+      }),
+    );
+    console.log("[SMS] publish ok", { messageId: res.MessageId, phoneLast4: phoneNumber.slice(-4) });
+  } catch (err) {
+    console.error("[SMS] publish failed", { phoneLast4: phoneNumber.slice(-4), err });
+    throw err;
+  }
 }
 
 function formatPctPtBr(value: number) {
@@ -407,7 +419,6 @@ export const handler = async (_event: ScheduledEvent) => {
           "",
           `Seu alerta foi atingido para ${sym}.`,
           `Preço atual: R$ ${p.toFixed(2)}`,
-          `Variação desde a ativação: ${formatPctPtBr(pct)}`,
           "",
           "Este alerta será desativado automaticamente.",
         ].join("\n");

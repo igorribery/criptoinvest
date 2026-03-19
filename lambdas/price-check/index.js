@@ -47062,12 +47062,24 @@ async function sendEmail(to, subject, textBody, htmlBody) {
 }
 async function sendSmsE164(phoneNumber, message) {
   if ((env.SMS_ENABLED ?? "false").toLowerCase() !== "true") return;
-  await sns.send(
-    new import_client_sns.PublishCommand({
-      PhoneNumber: phoneNumber,
-      Message: message
-    })
-  );
+  try {
+    const res = await sns.send(
+      new import_client_sns.PublishCommand({
+        PhoneNumber: phoneNumber,
+        Message: message,
+        MessageAttributes: {
+          "AWS.SNS.SMS.SMSType": {
+            DataType: "String",
+            StringValue: "Transactional"
+          }
+        }
+      })
+    );
+    console.log("[SMS] publish ok", { messageId: res.MessageId, phoneLast4: phoneNumber.slice(-4) });
+  } catch (err2) {
+    console.error("[SMS] publish failed", { phoneLast4: phoneNumber.slice(-4), err: err2 });
+    throw err2;
+  }
 }
 function formatPctPtBr(value) {
   const sign = value > 0 ? "+" : value < 0 ? "-" : "";
@@ -47224,7 +47236,6 @@ var handler = async (_event) => {
           "",
           `Seu alerta foi atingido para ${sym}.`,
           `Pre\xE7o atual: R$ ${p5.toFixed(2)}`,
-          `Varia\xE7\xE3o desde a ativa\xE7\xE3o: ${formatPctPtBr(pct)}`,
           "",
           "Este alerta ser\xE1 desativado automaticamente."
         ].join("\n");
