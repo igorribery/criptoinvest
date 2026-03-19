@@ -84,6 +84,10 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'alert_direction') THEN
     CREATE TYPE alert_direction AS ENUM ('ABOVE', 'BELOW');
   END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'alert_type') THEN
+    CREATE TYPE alert_type AS ENUM ('PERIODIC', 'TARGET_ONCE');
+  END IF;
 END
 $$;
 
@@ -107,9 +111,20 @@ CREATE TABLE IF NOT EXISTS price_alerts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   symbol TEXT NOT NULL,
-  direction alert_direction NOT NULL,
-  target_price_brl NUMERIC(20,2) NOT NULL CHECK (target_price_brl > 0),
-  frequency TEXT NOT NULL,
+  alert_type alert_type NOT NULL DEFAULT 'TARGET_ONCE',
+  -- TARGET_ONCE: direction + target_price_brl
+  direction alert_direction,
+  target_price_brl NUMERIC(20,2) CHECK (target_price_brl > 0),
+  -- PERIODIC: period_hours (4/12/24)
+  period_hours INTEGER CHECK (period_hours IN (4, 12, 24)),
+  -- Canais
+  notify_email BOOLEAN NOT NULL DEFAULT true,
+  notify_sms BOOLEAN NOT NULL DEFAULT false,
+  sms_phone_number TEXT,
+  -- Preço de ativação (baseline inicial para variação percentual)
+  activated_price_brl NUMERIC(20,2) CHECK (activated_price_brl > 0),
+  -- TARGET_ONCE: marca quando disparou
+  triggered_at TIMESTAMPTZ,
   is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
