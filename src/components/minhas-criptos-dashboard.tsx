@@ -82,6 +82,24 @@ function formatCryptoQty6(value: number, fallback: string) {
   return value.toFixed(6);
 }
 
+function onlyDigits(value: string): string {
+  return value.replace(/\D/g, "");
+}
+
+function formatBrazilPhoneMask(value: string): string {
+  const digits = onlyDigits(value).slice(0, 11);
+  if (digits.length <= 2) return digits ? `(${digits}` : "";
+  if (digits.length <= 6) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+}
+
+function toE164Brazil(value: string): string | null {
+  const digits = onlyDigits(value);
+  if (digits.length < 10 || digits.length > 11) return null;
+  return `+55${digits}`;
+}
+
 export function MinhasCriptosDashboard() {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [entries, setEntries] = useState<PortfolioEntry[]>([]);
@@ -237,7 +255,8 @@ export function MinhasCriptosDashboard() {
     loadAlerts(alertsSymbol, alertsPage);
   }, [alertsOpen, alertsSymbol, alertsPage, loadAlerts]);
 
-  const canSubmitSms = !formNotifySms || formSmsPhone.trim().length > 0;
+  const smsE164 = toE164Brazil(formSmsPhone);
+  const canSubmitSms = !formNotifySms || !!smsE164;
   const canSubmit = formNotifyEmail || formNotifySms;
   const canSubmitTarget = activeTab !== "TARGET_ONCE" || Number(formTargetPrice) > 0;
 
@@ -270,7 +289,7 @@ export function MinhasCriptosDashboard() {
               periodHours: formPeriodicHours,
               notifyEmail: formNotifyEmail,
               notifySms: formNotifySms,
-              smsPhoneNumber: formNotifySms ? formSmsPhone.trim() : undefined,
+              smsPhoneNumber: formNotifySms ? smsE164 ?? undefined : undefined,
             }
           : {
               alertType: "TARGET_ONCE",
@@ -278,7 +297,7 @@ export function MinhasCriptosDashboard() {
               targetPriceBrl: Number(formTargetPrice),
               notifyEmail: formNotifyEmail,
               notifySms: formNotifySms,
-              smsPhoneNumber: formNotifySms ? formSmsPhone.trim() : undefined,
+              smsPhoneNumber: formNotifySms ? smsE164 ?? undefined : undefined,
             };
 
       await api.post<{ alert: AlertItem }>("/alerts", body, headers);
@@ -640,12 +659,17 @@ export function MinhasCriptosDashboard() {
 
               {formNotifySms ? (
                 <div>
-                  <Label>Telefone (E.164)</Label>
-                  <Input
-                    onChange={(e) => setFormSmsPhone(e.target.value)}
-                    placeholder="+5511999999999"
-                    value={formSmsPhone}
-                  />
+                  <Label>Telefone</Label>
+                  <div className="mt-1 flex items-center rounded-md border border-slate-700 bg-slate-900/50 focus-within:ring-1 focus-within:ring-cyan-500">
+                    <span className="select-none border-r border-slate-700 px-3 text-sm text-slate-300">+55</span>
+                    <Input
+                      className="border-0 bg-transparent shadow-none focus-visible:ring-0"
+                      inputMode="numeric"
+                      onChange={(e) => setFormSmsPhone(formatBrazilPhoneMask(e.target.value))}
+                      placeholder="(38) 99816-7744"
+                      value={formSmsPhone}
+                    />
+                  </div>
                   <p className="mt-2 text-sm text-slate-400">Obrigatório para alertas via SMS.</p>
                 </div>
               ) : null}
