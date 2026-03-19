@@ -4,11 +4,41 @@ import { requireAuth } from "../middleware/auth.js";
 import { isPositiveNumber } from "../utils/validators.js";
 import { CreateAlertType, UpdateAlertType } from "../types/alerts.routes-types.js";
 import { ALLOWED_ALERT_TYPE, ALLOWED_DIRECTION, ALLOWED_PERIOD_HOURS } from "../types/alerts.routes-types.js";
-import { fetchSpotPricesBrl } from "../services/market.service.js";
 
 export const alertsRouter = Router();
 
 alertsRouter.use(requireAuth);
+
+async function getUserAveragePriceForSymbol(params: {
+  userId: string;
+  symbol: string;
+}): Promise<number | null> {
+  const { userId, symbol } = params;
+  const result = await pool.query(
+    `SELECT
+      COALESCE(SUM(CASE WHEN side = 'BUY' THEN quantity::numeric ELSE 0 END), 0) AS buy_qty,
+      COALESCE(SUM(CASE WHEN side = 'BUY' THEN total_value_brl::numeric ELSE 0 END), 0) AS buy_val,
+      COALESCE(SUM(CASE WHEN side = 'SELL' THEN quantity::numeric ELSE 0 END), 0) AS sell_qty
+     FROM portfolio_entries
+     WHERE user_id = $1
+       AND symbol = $2`,
+    [userId, symbol.toUpperCase().trim()],
+  );
+
+  const buyQty = Number(result.rows[0]?.buy_qty ?? 0);
+  const buyVal = Number(result.rows[0]?.buy_val ?? 0);
+  const sellQty = Number(result.rows[0]?.sell_qty ?? 0);
+  if (!Number.isFinite(buyQty) || !Number.isFinite(buyVal) || !Number.isFinite(sellQty)) return null;
+
+  const netQty = buyQty - sellQty;
+  if (netQty <= 1e-10) return null;
+
+  const avgBuyUnit = buyQty > 0 ? buyVal / buyQty : 0;
+  const bookValue = Math.max(0, buyVal - sellQty * avgBuyUnit);
+  const avgPrice = netQty > 0 ? bookValue / netQty : 0;
+  if (!Number.isFinite(avgPrice) || avgPrice <= 0) return null;
+  return avgPrice;
+}
 
 alertsRouter.post("/", async (req, res) => {
   const body = req.body as CreateAlertType;
@@ -77,25 +107,23 @@ alertsRouter.post("/", async (req, res) => {
     return res.status(400).json({ message: "targetPriceBrl deve ser número positivo." });
   }
 
-  // Se não veio direction, inferimos pelo preço atual:
-  // - target >= preço atual => ABOVE (espera subir)
-  // - target < preço atual  => BELOW (espera cair)
+  // Se não veio direction, inferimos pelo preço médio da carteira:
+  // - target >= preço médio => ABOVE (espera subir)
+  // - target < preço médio  => BELOW (espera cair)
   if (!direction) {
-    try {
-      const { prices } = await fetchSpotPricesBrl([symbol.toUpperCase()]);
-      const current = prices?.[symbol.toUpperCase()];
-      if (typeof current === "number" && Number.isFinite(current)) {
-        direction = targetPriceBrl >= current ? "ABOVE" : "BELOW";
-      }
-    } catch {
-      // ignore
+    const avgPrice = await getUserAveragePriceForSymbol({
+      userId: req.authUser!.id,
+      symbol: symbol.toUpperCase(),
+    });
+    if (typeof avgPrice === "number" && Number.isFinite(avgPrice)) {
+      direction = targetPriceBrl >= avgPrice ? "ABOVE" : "BELOW";
     }
   }
 
   if (!direction || !ALLOWED_DIRECTION.includes(direction as (typeof ALLOWED_DIRECTION)[number])) {
     return res.status(400).json({
       message:
-        `direction inválido (não foi possível inferir automaticamente). Use ${ALLOWED_DIRECTION.join(" ou ")}.`,
+        `direction inválido (não foi possível inferir automaticamente pelo seu preço médio cadastrado). Use ${ALLOWED_DIRECTION.join(" ou ")}.`,
     });
   }
 
