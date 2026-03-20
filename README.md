@@ -1,394 +1,240 @@
 # CriptoInvest
 
-Aplicação full stack para acompanhar mercado cripto, autenticar usuários, registrar aportes e preparar alertas automáticos de preço.
+Aplicação full stack para acompanhar mercado cripto, autenticar usuários, registrar aportes e disparar alertas automáticos de preço.
 
-Hoje o projeto está organizado como uma monorepo simples com:
+## Estado atual (atualizado)
 
-- frontend em Next.js
-- API em Node.js + Express + TypeScript
-- PostgreSQL como banco principal
-- integrações com CoinGecko, Google OAuth e AWS
-- workers separados para rotina de preços e alertas
+O projeto está operando em arquitetura híbrida/produção com:
 
-## Visão geral
+- frontend em Next.js hospedado no AWS Amplify
+- API Node.js + Express hospedada no AWS Elastic Beanstalk
+- PostgreSQL no Amazon RDS (sa-east-1)
+- rotina de alertas em AWS Lambda + EventBridge + DynamoDB + Secrets Manager
+- integrações com CoinGecko, Google OAuth, AWS SES e S3
 
-O estado atual do projeto é:
-
-- a home pública já consome dados reais do CoinGecko e mostra o top 10 de criptomoedas
-- a API já possui autenticação própria com e-mail/senha
-- o cadastro usa confirmação por código enviado por e-mail
-- existe login com Google
-- existe recuperação de senha por e-mail
-- o usuário autenticado já pode editar nome, trocar senha, trocar e-mail com confirmação e enviar avatar para S3
-- a API já possui endpoints para lançamentos de carteira e alertas
-- as páginas `minhas-criptos` e `lancamentos` ainda estão como base visual/preparação de integração
-- os workers existem, mas ainda estão em modo inicial com `TODOs` no código
-
-## Arquitetura atual
+## Arquitetura em produção
 
 ```text
-Frontend (Next.js 16 / React 19 / TypeScript)
-        |
-        v
-API (Express / TypeScript)
-        |
-        v
-PostgreSQL
+Usuário
+  |
+  v
+Amplify (Next.js Frontend)
+  |
+  v
+Elastic Beanstalk (API Express)
+  |
+  v
+RDS PostgreSQL (sa-east-1)
 
-Integrações já presentes:
-- CoinGecko -> preços de mercado
-- Google OAuth -> login social
-- AWS SES -> envio de código e recuperação de senha
-- AWS S3 -> upload de avatar
-
-Fluxo planejado dos workers:
-- Price Worker -> rotina cron
-- SQS -> fila de eventos de alerta
-- Alert Worker -> consumo da fila e notificações
+EventBridge (rate 5 min)
+  |
+  v
+Lambda price-check
+  |-- lê/atualiza RDS (alertas)
+  |-- usa DynamoDB (estado/cooldown)
+  |-- lê DATABASE_URL no Secrets Manager
+  |-- envia notificações via SES (e SNS opcional para SMS)
 ```
 
-## Tecnologias usadas
+## URLs de referência (produção)
 
-### Frontend
+- Frontend Amplify: `https://main.d3uogzqxruse62.amplifyapp.com`
+- API Elastic Beanstalk: `https://criptoinvest.sa-east-1.elasticbeanstalk.com`
+- Healthcheck da API: `https://criptoinvest.sa-east-1.elasticbeanstalk.com/health`
 
-- Next.js `16.1.6`
-- React `19.2.4`
-- TypeScript
-- Tailwind CSS `3`
-- App Router
-- fetch nativo para integração com a API e CoinGecko
-- componentes UI próprios em `src/components/ui`
+> Se esses domínios mudarem, atualize também `NEXT_PUBLIC_API_URL`, `FRONTEND_URL` e `GOOGLE_REDIRECT_URI`.
 
-### Backend
+## Principais funcionalidades
 
-- Node.js
-- Express `4`
-- TypeScript
-- `pg` para PostgreSQL
-- `dotenv`
-- autenticação via token JWT com implementação própria
+- Home com top 10 criptomoedas via CoinGecko
+- Autenticação com e-mail/senha e Google OAuth
+- Recuperação de senha por e-mail
+- Perfil do usuário com atualização de dados e avatar no S3
+- Lançamentos de carteira e resumo de posição
+- Alertas de preço (`TARGET_ONCE` e `PERIODIC`)
+- Verificação automática de alertas via Lambda agendada
 
-### Integrações externas
-
-- CoinGecko para preços e mercado
-- Google OAuth 2.0 para login social
-- AWS SES v2 para e-mails de confirmação e redefinição de senha
-- AWS S3 para avatar do usuário
-- AWS SQS já previsto nos workers
-
-### Workers
-
-- `node-cron` no worker de preços
-- AWS SDK para SQS
-- AWS SDK para SES no worker de alertas
-
-## Estrutura do projeto
+## Estrutura do monorepo
 
 ```text
 criptoinvest/
-|-- src/                     # Frontend Next.js
-|   |-- app/                 # Rotas App Router
-|   |-- components/          # Componentes visuais e de autenticação
-|   |-- lib/                 # Cliente da API, auth local, CoinGecko
-|   `-- utils/               # Helpers de formatação
-|
-|-- api/
+|-- src/                      # Frontend Next.js (App Router)
+|-- api/                      # API Express + TS
 |   |-- src/
-|   |   |-- config/          # Variáveis de ambiente
-|   |   |-- db/              # Pool do PostgreSQL
-|   |   |-- middleware/      # Auth middleware
-|   |   |-- routes/          # Auth, market, portfolio e alerts
-|   |   |-- services/        # E-mail, storage e market
-|   |   `-- utils/           # Crypto e validações
-|   `-- sql/schema.sql       # Schema inicial do banco
-|
-|-- workers/
-|   |-- price-worker/        # Worker cron de preços
-|   `-- alert-worker/        # Worker de alertas
-|
-|-- package.json             # Frontend
+|   |-- sql/
+|   |-- scripts/run-schema.ts
+|   `-- Procfile              # usado no Elastic Beanstalk
+|-- lambdas/
+|   `-- price-check/          # Lambda de alertas
+|-- workers/                  # workers legados/em evolução
+|-- infra/                    # CDK stack para componentes de alertas
+|-- amplify.yml               # build do Amplify
 `-- README.md
 ```
 
-## Funcionalidades atuais
-
-### Frontend
-
-- página inicial com top 10 moedas por market cap
-- preço em BRL
-- variação de preço e sparkline
-- autenticação persistida no `localStorage`
-- rota protegida para área autenticada
-- tela de configurações com:
-  - edição de nome
-  - troca de senha
-  - troca de e-mail com código
-  - upload de avatar
-- callback de login com Google
-- página de redefinição de senha
-
-### API
+## Endpoints principais da API
 
 - `GET /health`
 - `GET /me`
-- autenticação:
+- Auth:
   - `POST /auth/register/start`
   - `POST /auth/register/confirm`
   - `POST /auth/register/resend`
   - `POST /auth/login`
   - `GET /auth/google/url`
   - `POST /auth/google/exchange`
-  - `PATCH /auth/profile`
-  - `POST /auth/profile/avatar`
-  - `POST /auth/password/change`
   - `POST /auth/password/forgot`
   - `POST /auth/password/reset`
-  - `POST /auth/email-change/start`
-  - `POST /auth/email-change/resend`
-  - `POST /auth/email-change/confirm`
-- mercado:
-  - `GET /market/top-10`
-  - `GET /market/spot-prices?symbols=BTC,ETH` (cotação BRL via CoinGecko)
-- carteira:
-  - `POST /portfolio/entries` (body: `assetType`, `symbol`, `assetName`, `purchaseDate`, `side` `BUY`|`SELL`, `quantity`, `unitPriceBrl`, `otherCostsBrl`)
+- Portfolio:
+  - `POST /portfolio/entries`
   - `GET /portfolio/entries`
   - `GET /portfolio/summary`
   - `DELETE /portfolio/entries/:id`
-- alertas:
+- Alerts:
   - `POST /alerts`
   - `GET /alerts`
   - `PATCH /alerts/:id`
   - `DELETE /alerts/:id`
 
-## Banco de dados
+## Variáveis de ambiente
 
-O schema atual em [api/sql/schema.sql] cria:
-
-- `users`
-- `pending_users`
-- `pending_email_changes`
-- `pending_password_resets`
-- `portfolio_entries` (com campo `side`: `BUY` ou `SELL`)
-- `price_alerts`
-- enums para tipo de ativo e direção do alerta
-
-**Banco já existente:** execute manualmente o SQL em [api/sql/migrations/002_portfolio_entry_side.sql](api/sql/migrations/002_portfolio_entry_side.sql) (adiciona a coluna `side` em `portfolio_entries`).
-
-Tipos de ativo aceitos hoje:
-
-- `CRYPTO`
-- `STOCK`
-- `ETF`
-
-## Como rodar o projeto
-
-### 1. Pré-requisitos
-
-Tenha instalado:
-
-- Node.js 20+ recomendado
-- npm
-- PostgreSQL
-
-Para fluxos opcionais/completos, também será necessário:
-
-- conta AWS com SES configurado
-- bucket S3
-- credenciais AWS disponíveis no ambiente
-- credenciais OAuth do Google
-
-### 2. Instalar dependências
-
-Instale em cada pacote:
-
-```bash
-npm install
-cd api
-npm install
-cd ..\workers\price-worker
-npm install
-cd ..\alert-worker
-npm install
-```
-
-### 3. Configurar variáveis de ambiente
-
-#### Frontend
-
-Use o arquivo da raiz como base:
-
-```bash
-cp .env.example .env.local
-```
-
-Variável usada hoje:
+### Frontend (`.env.local` / Amplify)
 
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:4000
+NEXT_PUBLIC_API_URL=https://criptoinvest.sa-east-1.elasticbeanstalk.com
 ```
 
-#### API
-
-Use `api/.env.example` como base para `api/.env`.
-
-Variáveis principais:
+### API (`api/.env` local ou variáveis no Elastic Beanstalk)
 
 ```env
-PORT=4000
-FRONTEND_URL=http://localhost:3000
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/criptoinvest
-JWT_SECRET=change-me-to-a-long-random-secret
-GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=your-google-client-secret
-GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
-AWS_REGION=us-east-1
-SES_FROM_EMAIL=no-reply@example.com
-S3_BUCKET_NAME=your-s3-bucket-name
+PORT=8081
+FRONTEND_URL=http://localhost:3000,https://main.d3uogzqxruse62.amplifyapp.com
+DATABASE_URL=postgresql://USER:PASSWORD@database-1.xxxxx.sa-east-1.rds.amazonaws.com:5432/postgres
+JWT_SECRET=your-long-random-secret
+AWS_REGION=sa-east-1
+SES_FROM_EMAIL=your-verified-email@example.com
+S3_BUCKET_NAME=your-bucket
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=https://main.d3uogzqxruse62.amplifyapp.com/auth/google/callback
 REGISTER_CODE_EXPIRES_MINUTES=15
 REGISTER_CODE_MAX_ATTEMPTS=5
 PASSWORD_RESET_EXPIRES_MINUTES=30
 ```
 
-Importante:
+### Lambda `price-check` (ambiente AWS)
 
-- `DATABASE_URL` e `JWT_SECRET` são obrigatórias para a API subir
-- sem `SES_FROM_EMAIL`, os fluxos que enviam e-mail vão falhar
-- sem `S3_BUCKET_NAME`, upload de avatar vai falhar
-- sem `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET`, login com Google fica desabilitado
+Obrigatórias:
 
-#### Workers
+- `DDB_TABLE_ALERT_STATE`
+- `DATABASE_URL_SECRET_ID` (Secrets Manager)
+- `SES_FROM_EMAIL`
 
-`workers/price-worker/.env`
+Opcionais:
 
-```env
-DATABASE_URL=postgresql://user:password@host:5432/criptoinvest
-SQS_QUEUE_URL=https://sqs.region.amazonaws.com/account/price-alerts
-AWS_REGION=us-east-1
-```
+- `COINGECKO_API_BASE_URL`
+- `SMS_ENABLED`
+- `RDS_SSL_REJECT_UNAUTHORIZED`
 
-`workers/alert-worker/.env`
+## Banco de dados
 
-```env
-SQS_QUEUE_URL=https://sqs.region.amazonaws.com/account/price-alerts
-AWS_REGION=us-east-1
-SES_FROM_EMAIL=noreply@seudominio.com
-```
+O schema em `api/sql/schema.sql` cria:
 
-### 4. Criar o banco
+- `users`
+- `pending_users`
+- `pending_email_changes`
+- `pending_password_resets`
+- `portfolio_entries`
+- `price_alerts`
 
-Crie o banco no PostgreSQL e execute:
+Para aplicar schema/migrations sem `psql`:
 
 ```bash
-psql "postgresql://postgres:postgres@localhost:5432/criptoinvest" -f api/sql/schema.sql
+cd api
+npm run run-schema
 ```
 
-Ou, se já estiver usando `DATABASE_URL` no ambiente:
+## Desenvolvimento local
+
+### Pré-requisitos
+
+- Node.js 20+
+- npm
+- acesso ao PostgreSQL (local ou RDS)
+
+### Instalação
 
 ```bash
-psql "%DATABASE_URL%" -f api/sql/schema.sql
+npm install
+cd api && npm install
+cd ../workers/price-worker && npm install
+cd ../alert-worker && npm install
 ```
 
-### 5. Subir os serviços
+### Rodar local
 
-#### Frontend
-
-```bash
-npm run dev
-```
-
-Aplicação em `http://localhost:3000`
-
-#### API
+Terminal 1 (API):
 
 ```bash
 cd api
 npm run dev
 ```
 
-API em `http://localhost:4000`
-
-#### Worker de preços
+Terminal 2 (Frontend):
 
 ```bash
-cd workers/price-worker
 npm run dev
 ```
 
-Existe também:
+## Deploy
+
+### API (Elastic Beanstalk)
+
+1. Build da API:
 
 ```bash
-npm run run:cron
+cd api
+npm run build
 ```
 
-#### Worker de alertas
+2. Gere `api-eb.zip` (sem artefatos sensíveis)
+3. Upload no Beanstalk
+4. Validar `GET /health`
 
-```bash
-cd workers/alert-worker
-npm run dev
-```
+### Frontend (Amplify)
 
-## Fluxo mínimo para desenvolvimento local
+1. Conectar branch no Amplify
+2. Definir `NEXT_PUBLIC_API_URL`
+3. Deploy com `amplify.yml`
+4. Validar login/cadastro/rotas autenticadas
 
-Se você quer apenas testar a aplicação web e a API:
-
-1. suba o PostgreSQL
-2. execute o schema SQL
-3. configure `api/.env`
-4. configure `.env.local` na raiz
-5. rode a API
-6. rode o frontend
-
-Nesse cenário:
-
-- a home pública funciona com CoinGecko
-- cadastro/login local funciona se o SES estiver configurado
-- login com Google depende das credenciais OAuth
-- avatar depende do S3
-- workers não são necessários para navegar pela maior parte da aplicação atual
-
-## Scripts disponíveis
+## Scripts úteis
 
 ### Raiz
 
-- `npm run dev` -> inicia o frontend Next.js
-- `npm run build` -> build de produção do frontend
-- `npm run start` -> sobe o frontend em modo produção
-- `npm run lint` -> lint do frontend
-- `npm run type-check` -> checagem de tipos do frontend
+- `npm run dev`
+- `npm run build`
+- `npm run start`
+- `npm run lint`
+- `npm run type-check`
 
 ### API
 
-- `npm run dev` -> API com `tsx watch`
-- `npm run build` -> compila TypeScript
-- `npm run start` -> executa `dist/index.js`
-- `npm run type-check` -> checagem de tipos
+- `npm run dev`
+- `npm run build`
+- `npm run start`
+- `npm run type-check`
+- `npm run run-schema`
 
-### Price Worker
+## Segurança e boas práticas
 
-- `npm run dev` -> watch mode
-- `npm run build` -> compila TypeScript
-- `npm run start` -> executa build compilada
-- `npm run run:cron` -> executa a rotina uma vez pelo entrypoint atual
+- Nunca commitar `.env`, `.env.local`, chaves ou segredos
+- Não versionar artefatos de deploy (`*.zip`)
+- Usar Secrets Manager/SSM para segredos em produção
+- Restringir Security Group do RDS para IPs/SGs necessários
+- Rotacionar credenciais AWS/DB periodicamente
 
-### Alert Worker
+## Observações
 
-- `npm run dev` -> watch mode
-- `npm run build` -> compila TypeScript
-- `npm run start` -> executa build compilada
-
-## Observações importantes sobre o estado atual
-
-- os workers ainda não executam a lógica final de busca de preço, envio para fila e disparo de alertas
-- as páginas `minhas-criptos` e `lancamentos` ainda estão em fase de integração com os dados reais
-- o backend já suporta lançamentos e alertas via API, mesmo com parte da UI ainda em evolução
-- o envio de e-mails depende de configuração válida da AWS SES
-- o upload de avatar depende de bucket S3 com permissões corretas
-
-## Próximos pontos naturais de evolução
-
-- conectar a UI de carteira aos endpoints `/portfolio`
-- conectar a UI de alertas aos endpoints `/alerts`
-- finalizar o `price-worker`
-- finalizar o `alert-worker`
-- adicionar migrations versionadas
-- adicionar testes automatizados
+- O endpoint `/` da API retorna `Cannot GET /` por design; use `/health` para verificação.
+- Parte dos workers em `workers/` é legado/em evolução; o fluxo ativo de alertas está na Lambda `lambdas/price-check`.

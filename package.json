@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:api": "npm --prefix api run dev",
+    "dev:local": "concurrently -n WEB,API -c cyan,magenta \"npm run dev\" \"npm run dev:api\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint .",
@@ -20,6 +22,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "autoprefixer": "^10.4.20",
+    "concurrently": "^9.2.1",
     "eslint": "^10.0.3",
     "eslint-config-next": "^16.1.6",
     "postcss": "^8.5.8",
