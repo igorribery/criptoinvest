@@ -1,0 +1,25 @@
+{
+  "name": "criptoinvest-price-check-lambda",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ./scripts/build.mjs",
+    "zip": "npm run build && node ./scripts/zip.mjs"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.892.0",
+    "@aws-sdk/lib-dynamodb": "^3.892.0",
+    "@aws-sdk/client-sesv2": "^3.892.0",
+    "@aws-sdk/client-sns": "^3.892.0",
+    "@aws-sdk/client-secrets-manager": "^3.892.0",
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.150",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.6",
+    "esbuild": "^0.25.1",
+    "typescript": "^5.6.0"
+  }
+}
