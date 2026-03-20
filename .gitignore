@@ -8,12 +8,19 @@ out
 # build outputs
 dist
 build
+cdk.out
+.cdk.staging
 
 # logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.log
+
+# deployment artifacts
+api/api-eb.zip
+lambdas/price-check/lambda.zip
 
 # environment variables
 .env*

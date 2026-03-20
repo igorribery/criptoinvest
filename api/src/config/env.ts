@@ -29,5 +29,10 @@ export const env = {
   passwordResetExpiresMinutes: Number(process.env.PASSWORD_RESET_EXPIRES_MINUTES ?? 30),
 };
 
+export const frontendAllowedOrigins = (process.env.FRONTEND_URL ?? "http://localhost:3000")
+  .split(",")
+  .map((v) => v.trim())
+  .filter(Boolean);
+
 export const isGoogleAuthEnabled = Boolean(env.googleClientId && env.googleClientSecret);
 export const isSesEnabled = Boolean(env.sesFromEmail);

@@ -1,6 +1,6 @@
 import "dotenv/config";
 import express from "express";
-import { env } from "./config/env.js";
+import { env, frontendAllowedOrigins } from "./config/env.js";
 import { pool } from "./db/pool.js";
 import { requireAuth } from "./middleware/auth.js";
 import { alertsRouter } from "./routes/alerts.routes.js";
@@ -12,7 +12,10 @@ const app = express();
 
 app.use(express.json({ limit: "3mb" }));
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", env.frontendUrl);
+  const origin = req.headers.origin;
+  if (!origin || frontendAllowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin ?? env.frontendUrl);
+  }
   res.header("Vary", "Origin");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS");
