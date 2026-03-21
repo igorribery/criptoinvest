@@ -4,24 +4,34 @@ Aplicação full stack para acompanhar mercado cripto, autenticar usuários, reg
 
 ## Estado atual (atualizado)
 
-O projeto está operando em arquitetura híbrida/produção com:
+O projeto está operando em arquitetura de produção com:
 
 - frontend em Next.js hospedado no AWS Amplify
-- API Node.js + Express hospedada no AWS Elastic Beanstalk
+- CDN + proxy HTTPS via AWS CloudFront
+- API Node.js + Express hospedada no AWS Elastic Beanstalk (Load Balanced)
+- Load Balancer (ELB) como entrypoint da API
 - PostgreSQL no Amazon RDS (sa-east-1)
 - rotina de alertas em AWS Lambda + EventBridge + DynamoDB + Secrets Manager
 - integrações com CoinGecko, Google OAuth, AWS SES e S3
 
-## Arquitetura em produção
+---
+
+## 🏗️ Arquitetura em produção
 
 ```text
-Usuário
+Usuário (Browser)
   |
   v
-Amplify (Next.js Frontend)
+Amplify (Next.js Frontend - HTTPS)
   |
   v
-Elastic Beanstalk (API Express)
+CloudFront (CDN + HTTPS + Proxy)
+  |
+  v
+Load Balancer (ELB)
+  |
+  v
+Elastic Beanstalk (API Express - EC2)
   |
   v
 RDS PostgreSQL (sa-east-1)
@@ -34,7 +44,6 @@ Lambda price-check
   |-- usa DynamoDB (estado/cooldown)
   |-- lê DATABASE_URL no Secrets Manager
   |-- envia notificações via SES (e SNS opcional para SMS)
-```
 
 ## URLs de referência (produção)
 
